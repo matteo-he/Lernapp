@@ -129,13 +129,13 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
 
                     if (showExplain) {
                         if (isCorrect) {
-                            stateClass = "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-500/50";
-                            indicator = <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center">✓</div>;
+                            stateClass = "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-500";
+                            indicator = <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm">✓</div>;
                         } else if (isSelected && !isCorrect) {
-                            stateClass = "border-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-500/50";
-                            indicator = <div className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center">✕</div>;
+                            stateClass = "border-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-500";
+                            indicator = <div className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-sm font-bold">✕</div>;
                         } else {
-                            stateClass = "opacity-50 grayscale";
+                            stateClass = "opacity-50 grayscale border-transparent";
                         }
                     } else if (isSelected) {
                         stateClass = "border-police-500 bg-police-50 dark:bg-police-900/30 ring-1 ring-police-500";
