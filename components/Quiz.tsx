@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Question, GROUPS } from '../types';
 import { Card } from './Card';
@@ -15,6 +16,7 @@ interface QuizProps {
   onBookmark?: (id: string) => void;
   isBookmarked?: boolean;
   srsLevel?: number;
+  feedbackMeta?: { label: string, isCorrect: boolean } | null;
 }
 
 // Helper for shuffling
@@ -63,7 +65,7 @@ const BADGE_COLORS: Record<string, string> = {
 
 export const Quiz: React.FC<QuizProps> = ({ 
     question, idx, score, streak, onAnswer, onNext, onSkip, showExplain, 
-    mode = 'training', onBookmark, isBookmarked, srsLevel 
+    mode = 'training', onBookmark, isBookmarked, srsLevel, feedbackMeta 
 }) => {
   const [selected, setSelected] = useState<number[]>([]);
 
@@ -236,9 +238,12 @@ export const Quiz: React.FC<QuizProps> = ({
                                     <h3 className={`text-xl font-black ${isCorrectAnswer ? 'text-emerald-800 dark:text-emerald-400' : 'text-rose-800 dark:text-rose-400'}`}>
                                         {isCorrectAnswer ? 'Hervorragend!' : 'Leider falsch'}
                                     </h3>
-                                    <p className={`text-sm font-medium ${isCorrectAnswer ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
-                                        {isCorrectAnswer ? 'Die Antwort ist absolut korrekt.' : 'Sieh dir die Lösung genau an.'}
-                                    </p>
+                                    {feedbackMeta && (
+                                        <div className={`text-sm font-bold flex items-center gap-2 mt-1 ${isCorrectAnswer ? 'text-emerald-600 dark:text-emerald-300' : 'text-rose-600 dark:text-rose-300'}`}>
+                                            <span>{isCorrectAnswer ? '↗️' : '🔄'}</span>
+                                            Nächste Wiederholung: {feedbackMeta.label}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             

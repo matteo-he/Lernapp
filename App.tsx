@@ -47,6 +47,18 @@ const SRS_INTERVALS = [
     14 * 24 * 60 * 60 * 1000, // Level 5: 14 Days
 ];
 
+function getSRSLabel(level: number): string {
+    switch(level) {
+        case 0: return "Sofort";
+        case 1: return "10 Minuten";
+        case 2: return "1 Tag";
+        case 3: return "3 Tage";
+        case 4: return "1 Woche";
+        case 5: return "2 Wochen";
+        default: return "Lange Zeit";
+    }
+}
+
 export default function App() {
   // Theme State
   const [theme, setTheme] = useState(() => {
@@ -81,6 +93,10 @@ export default function App() {
   const [score, setScore] = useState(() => {
      return progress.totalCorrect * 10;
   });
+
+  // SRS Visual Feedback
+  const [feedbackMeta, setFeedbackMeta] = useState<{ label: string, isCorrect: boolean } | null>(null);
+  const [frozenQuestion, setFrozenQuestion] = useState<Question | null>(null);
 
   // Filter
   const [filter, setFilter] = useState<FilterState>({ tags: [], difficulty: 0, bookmarkOnly: false, searchQuery: "" });
@@ -143,6 +159,8 @@ export default function App() {
       return q;
   }, [questions, filter, progress.bookmarks, progress.reviewQueue, progress.nextReviewDate, view]);
 
+  const currentQuestion = getCandidateQuestions.length > 0 ? getCandidateQuestions[quizIdx % getCandidateQuestions.length] : null;
+
   const handleAnswer = (selectedIndices: number[]) => {
     if (showExplain || !currentQuestion) return;
     
@@ -179,7 +197,20 @@ export default function App() {
        }
        return; 
     }
+
+    // Freeze the current question so the UI doesn't swap it out if the SRS logic removes it from the list
+    setFrozenQuestion(currentQuestion);
     
+    // Prepare Feedback Meta
+    let nextLabel = "Sofort";
+    if (isCorrect) {
+        const currentS = (progress.reviewStreak || {})[currentQuestion.id] || 0;
+        const newS = currentS + 1;
+        nextLabel = getSRSLabel(newS);
+    } else {
+        nextLabel = "Sofort";
+    }
+    setFeedbackMeta({ label: nextLabel, isCorrect });
     setShowExplain(true);
     
     if (isCorrect) {
@@ -219,7 +250,7 @@ export default function App() {
                  const interval = SRS_INTERVALS[Math.min(newS, SRS_INTERVALS.length - 1)] || SRS_INTERVALS[SRS_INTERVALS.length-1];
                  nextReviewDate[currentQuestion.id] = Date.now() + interval;
 
-                 // Remove from queue if mastered (e.g., Level 6)
+                 // Remove from queue if mastered (e.g., Level 6 - optional, here we just keep pushing date)
                  if (newS >= 6) {
                      reviewQueue = reviewQueue.filter(id => id !== currentQuestion.id);
                  }
@@ -241,7 +272,18 @@ export default function App() {
 
   const nextQuestion = () => {
     setShowExplain(false);
-    setQuizIdx(i => i + 1);
+    setFrozenQuestion(null);
+    const wasCorrect = feedbackMeta?.isCorrect;
+    setFeedbackMeta(null);
+    
+    // In 'review' mode, if the answer was correct, the item is removed from the due list.
+    // The list shifts, so the element at current index `quizIdx` is the *next* element.
+    // We should NOT increment `quizIdx` in this case to avoid skipping.
+    if (view === 'review' && wasCorrect) {
+        setQuizIdx(i => i); // Keep index same
+    } else {
+        setQuizIdx(i => i + 1);
+    }
   };
   
   const toggleBookmark = (id: string) => {
@@ -253,8 +295,6 @@ export default function App() {
   };
 
   // --- Derived State ---
-  const currentQuestion = getCandidateQuestions.length > 0 ? getCandidateQuestions[quizIdx % getCandidateQuestions.length] : null;
-
   const stats = useMemo(() => {
     return GROUPS.map(g => {
         const groupQuestions = questions.filter(q => q.tags.some(t => g.tags.includes(t)));
@@ -585,12 +625,12 @@ export default function App() {
 
                         {/* Content Area */}
                         <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 p-6 md:p-8">
+                             {/* ... details ... */}
                              {(() => {
-                                // Logic to sort questions & tags
+                                // ... same as before ...
                                 const groupQs = questions.filter(q => q.tags.some(t => detailedStatsGroup.tags.includes(t)));
                                 const groupTags = detailedStatsGroup.tags;
                                 
-                                // Tag Stats Calculation
                                 const tagStats = groupTags.map((tag: string) => {
                                     const tagQs = questions.filter(q => q.tags.includes(tag));
                                     let tAtt = 0;
@@ -603,14 +643,13 @@ export default function App() {
                                 }).filter((t: any) => t.total > 0).sort((a: any,b: any) => {
                                     const effA = a.tAtt ? a.tCorr/a.tAtt : 0;
                                     const effB = b.tAtt ? b.tCorr/b.tAtt : 0;
-                                    return effA - effB; // Sort ascending efficiency (weakest first)
+                                    return effA - effB; 
                                 });
 
-                                // Categorize Questions
                                 const critical = groupQs.filter(q => {
                                     const att = progress.attemptedIds[q.id] || 0;
                                     const corr = progress.correctIds[q.id] || 0;
-                                    return att > 0 && (corr / att) <= 0.6; // High error rate
+                                    return att > 0 && (corr / att) <= 0.6;
                                 });
 
                                 const stable = groupQs.filter(q => {
@@ -677,9 +716,7 @@ export default function App() {
 
                                 return (
                                     <div className="animate-fade-in">
-                                        {/* Tag Breakdown & Weakest Link */}
                                         <div className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                            {/* Tag Breakdown */}
                                             <div className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm">
                                                 <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2"><span className="text-lg">📈</span> Themen-Deep-Dive</h4>
                                                 <div className="space-y-3 max-h-48 overflow-y-auto pr-2">
@@ -700,7 +737,6 @@ export default function App() {
                                                 </div>
                                             </div>
 
-                                            {/* Recommendation Card */}
                                             <div className="p-5 rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-700 text-white shadow-lg flex flex-col justify-center">
                                                 <h4 className="font-bold mb-1 opacity-90 text-sm uppercase tracking-wide">Fokus-Empfehlung</h4>
                                                 {tagStats.length > 0 && tagStats[0].tAtt > 0 ? (
@@ -763,7 +799,8 @@ export default function App() {
   // Review View (Fehler-Archiv)
   if (view === 'review') {
       const reviewQueueCount = (progress.reviewQueue || []).length;
-      
+      const questionDisplay = showExplain ? frozenQuestion : currentQuestion;
+
       return (
         <Layout user={activeUser} onLogout={handleLogout} currentView="dashboard" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
             <div className="mb-6 flex items-center justify-between">
@@ -779,7 +816,7 @@ export default function App() {
             </div>
 
             <Quiz 
-                question={currentQuestion} 
+                question={questionDisplay} 
                 idx={quizIdx} 
                 score={score}
                 streak={streak}
@@ -788,8 +825,9 @@ export default function App() {
                 onSkip={nextQuestion}
                 showExplain={showExplain}
                 onBookmark={toggleBookmark}
-                isBookmarked={currentQuestion && (progress.bookmarks || []).includes(currentQuestion.id)}
-                srsLevel={currentQuestion ? (progress.reviewStreak?.[currentQuestion.id] || 0) : 0}
+                isBookmarked={questionDisplay && (progress.bookmarks || []).includes(questionDisplay.id)}
+                srsLevel={questionDisplay ? (progress.reviewStreak?.[questionDisplay.id] || 0) : 0}
+                feedbackMeta={feedbackMeta}
             />
         </Layout>
       );
@@ -842,6 +880,7 @@ export default function App() {
   }
 
   // Training View
+  const questionDisplay = showExplain ? frozenQuestion : currentQuestion;
   return (
     <Layout user={activeUser} onLogout={handleLogout} currentView="train" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
         {/* Search Bar */}
@@ -889,7 +928,7 @@ export default function App() {
         </div>
 
         <Quiz 
-            question={currentQuestion} 
+            question={questionDisplay} 
             idx={quizIdx} 
             score={score}
             streak={streak}
@@ -898,7 +937,8 @@ export default function App() {
             onSkip={nextQuestion}
             showExplain={showExplain}
             onBookmark={toggleBookmark}
-            isBookmarked={currentQuestion && (progress.bookmarks || []).includes(currentQuestion.id)}
+            isBookmarked={questionDisplay && (progress.bookmarks || []).includes(questionDisplay.id)}
+            feedbackMeta={feedbackMeta}
         />
     </Layout>
   );
