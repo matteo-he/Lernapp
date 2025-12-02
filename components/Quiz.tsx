@@ -14,7 +14,7 @@ interface QuizProps {
   mode?: string;
   onBookmark?: (id: string) => void;
   isBookmarked?: boolean;
-  reviewLeft?: number;
+  srsLevel?: number;
 }
 
 // Helper for shuffling
@@ -63,7 +63,7 @@ const BADGE_COLORS: Record<string, string> = {
 
 export const Quiz: React.FC<QuizProps> = ({ 
     question, idx, score, streak, onAnswer, onNext, onSkip, showExplain, 
-    mode = 'training', onBookmark, isBookmarked, reviewLeft 
+    mode = 'training', onBookmark, isBookmarked, srsLevel 
 }) => {
   const [selected, setSelected] = useState<number[]>([]);
 
@@ -94,7 +94,8 @@ export const Quiz: React.FC<QuizProps> = ({
       <Card className="p-12 text-center">
         <div className="text-6xl mb-4">🎉</div>
         <h3 className="text-xl font-bold mb-2">Alles erledigt!</h3>
-        <p className="text-slate-500">Für die gewählten Filter gibt es keine weiteren Fragen.</p>
+        <p className="text-slate-500">Du hast alle fälligen Wiederholungen für jetzt gemeistert.</p>
+        <p className="text-sm text-slate-400 mt-2">Komm später wieder oder lerne neue Bereiche.</p>
       </Card>
     );
   }
@@ -125,9 +126,9 @@ export const Quiz: React.FC<QuizProps> = ({
             <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium border border-slate-200 dark:border-slate-700">
                 Level {question.difficulty}
             </span>
-            {reviewLeft !== undefined && (
-                <span className="px-3 py-1 rounded-full bg-rose-500 text-white text-xs font-bold border border-rose-600 animate-pulse">
-                    Noch {reviewLeft}x richtig
+            {srsLevel !== undefined && (
+                <span className="px-3 py-1 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 text-xs font-bold border border-indigo-200 dark:border-indigo-800">
+                    Wissens-Stufe {srsLevel} 🔥
                 </span>
             )}
         </div>

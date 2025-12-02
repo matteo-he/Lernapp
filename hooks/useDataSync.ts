@@ -136,7 +136,8 @@ export function useProgress(userId: string | null) {
             correctIds: {},
             bookmarks: [],
             reviewQueue: [],
-            reviewStreak: {}
+            reviewStreak: {},
+            nextReviewDate: {}
         };
         if (!key) return defaultState;
         try { 
@@ -173,7 +174,8 @@ export function useProgress(userId: string | null) {
                             // Ensure arrays exist if remote didn't have them
                             bookmarks: remoteProg.bookmarks || [],
                             reviewQueue: remoteProg.reviewQueue || [],
-                            reviewStreak: remoteProg.reviewStreak || {}
+                            reviewStreak: remoteProg.reviewStreak || {},
+                            nextReviewDate: remoteProg.nextReviewDate || {}
                         }));
                         applyingRemote.current = false;
                     }

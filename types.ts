@@ -1,3 +1,4 @@
+
 export interface Question {
   id: string;
   question: string;
@@ -26,12 +27,14 @@ export interface UserProgress {
   bookmarks?: string[];
   reviewQueue?: string[];
   reviewStreak?: Record<string, number>;
+  nextReviewDate?: Record<string, number>;
 }
 
 export interface FilterState {
   tags: string[];
   difficulty: number;
   bookmarkOnly: boolean;
+  searchQuery: string;
 }
 
 export interface ChatMessage {

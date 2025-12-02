@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useQuestions, useUsers, useProgress } from './hooks/useDataSync';
 import { Layout } from './components/Layout';
@@ -36,6 +37,16 @@ function rankFor(score: number){
   return r? r.title : RANKS[0].title;
 }
 
+// Spaced Repetition Intervals in MS
+const SRS_INTERVALS = [
+    0, // Level 0: Immediate
+    10 * 60 * 1000, // Level 1: 10 Minutes
+    24 * 60 * 60 * 1000, // Level 2: 1 Day
+    3 * 24 * 60 * 60 * 1000, // Level 3: 3 Days
+    7 * 24 * 60 * 60 * 1000, // Level 4: 7 Days
+    14 * 24 * 60 * 60 * 1000, // Level 5: 14 Days
+];
+
 export default function App() {
   // Theme State
   const [theme, setTheme] = useState(() => {
@@ -72,7 +83,7 @@ export default function App() {
   });
 
   // Filter
-  const [filter, setFilter] = useState<FilterState>({ tags: [], difficulty: 0, bookmarkOnly: false });
+  const [filter, setFilter] = useState<FilterState>({ tags: [], difficulty: 0, bookmarkOnly: false, searchQuery: "" });
 
   // Admin Search & Edit State
   const [adminSearch, setAdminSearch] = useState("");
@@ -99,17 +110,38 @@ export default function App() {
 
   const getCandidateQuestions = useMemo(() => {
       let q = questions;
+      
+      // SRS Review Logic: Only show items from queue that are DUE
       if (view === 'review') {
-          return q.filter(x => (progress.reviewQueue || []).includes(x.id));
+          const now = Date.now();
+          return q.filter(x => {
+              const inQueue = (progress.reviewQueue || []).includes(x.id);
+              const nextDate = (progress.nextReviewDate || {})[x.id] || 0;
+              // It's due if it's in queue AND (no date set OR date is in past)
+              return inQueue && nextDate <= now;
+          });
       }
 
+      // Filter by Tags/Bookmarks logic
       if (filter.bookmarkOnly) {
           q = q.filter(x => (progress.bookmarks || []).includes(x.id));
       } else if (filter.tags.length > 0) {
           q = q.filter(x => x.tags.some(t => filter.tags.includes(t)));
       }
+
+      // Search Logic - Applies on top of Categories/Bookmarks
+      if (filter.searchQuery.trim()) {
+          const term = filter.searchQuery.toLowerCase();
+          q = q.filter(x => 
+              x.question.toLowerCase().includes(term) || 
+              x.explain.toLowerCase().includes(term) ||
+              x.law_ref.toLowerCase().includes(term) ||
+              x.tags.some(t => t.toLowerCase().includes(term))
+          );
+      }
+
       return q;
-  }, [questions, filter, progress.bookmarks, progress.reviewQueue, view]);
+  }, [questions, filter, progress.bookmarks, progress.reviewQueue, progress.nextReviewDate, view]);
 
   const handleAnswer = (selectedIndices: number[]) => {
     if (showExplain || !currentQuestion) return;
@@ -164,26 +196,31 @@ export default function App() {
         const correctIds = { ...prev.correctIds };
         if (isCorrect) correctIds[currentQuestion.id] = (correctIds[currentQuestion.id] || 0) + 1;
         
-        // Smart Review (Fehler-Archiv) Logic
+        // --- Spaced Repetition Logic ---
         let reviewQueue = prev.reviewQueue ? [...prev.reviewQueue] : [];
         let reviewStreak = prev.reviewStreak ? { ...prev.reviewStreak } : {};
+        let nextReviewDate = prev.nextReviewDate ? { ...prev.nextReviewDate } : {};
         
         if (!isCorrect) {
-             // Wrong answer: Add to queue if not present
+             // WRONG: Reset Streak, Due Immediately
              if (!reviewQueue.includes(currentQuestion.id)) {
                  reviewQueue.push(currentQuestion.id);
              }
-             // Reset review streak
              reviewStreak[currentQuestion.id] = 0;
+             nextReviewDate[currentQuestion.id] = Date.now(); // Due now
         } else {
-             // Correct answer
+             // CORRECT: Increase Streak, Push Date
              if (reviewQueue.includes(currentQuestion.id)) {
                  const currentS = reviewStreak[currentQuestion.id] || 0;
                  const newS = currentS + 1;
                  reviewStreak[currentQuestion.id] = newS;
                  
-                 // Remove if correct 2 times in a row
-                 if (newS >= 2) {
+                 // Calculate next interval
+                 const interval = SRS_INTERVALS[Math.min(newS, SRS_INTERVALS.length - 1)] || SRS_INTERVALS[SRS_INTERVALS.length-1];
+                 nextReviewDate[currentQuestion.id] = Date.now() + interval;
+
+                 // Remove from queue if mastered (e.g., Level 6)
+                 if (newS >= 6) {
                      reviewQueue = reviewQueue.filter(id => id !== currentQuestion.id);
                  }
              }
@@ -196,7 +233,8 @@ export default function App() {
             attemptedIds,
             correctIds,
             reviewQueue,
-            reviewStreak
+            reviewStreak,
+            nextReviewDate
         };
     });
   };
@@ -229,6 +267,16 @@ export default function App() {
         return { ...g, total: groupQuestions.length, attempted, correct };
     });
   }, [questions, progress]);
+
+  // Calculate Due Reviews for Dashboard
+  const dueReviewsCount = useMemo(() => {
+      if (!progress.reviewQueue) return 0;
+      const now = Date.now();
+      return progress.reviewQueue.filter(id => {
+          const date = (progress.nextReviewDate || {})[id] || 0;
+          return date <= now;
+      }).length;
+  }, [progress]);
 
   // --- Render ---
 
@@ -359,6 +407,8 @@ export default function App() {
 
   // Dashboard View
   if (view === 'dashboard') {
+    const totalQueue = (progress.reviewQueue || []).length;
+    
     return (
       <Layout user={activeUser} onLogout={handleLogout} currentView="dashboard" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
          <div className="mb-8 animate-fade-in flex flex-col md:flex-row justify-between items-center gap-4">
@@ -371,17 +421,17 @@ export default function App() {
             </div>
          </div>
 
-         {/* Smart Review Card */}
+         {/* Smart Review Card (Updated for SRS) */}
          <div className="mb-8">
              <div 
                 onClick={() => {
-                    if((progress.reviewQueue || []).length > 0) {
+                    if(totalQueue > 0) {
                         setView('review');
                         setQuizIdx(0);
                     }
                 }}
                 className={`relative overflow-hidden rounded-2xl p-6 md:p-8 cursor-pointer transition-all duration-300 ${
-                    (progress.reviewQueue || []).length > 0 
+                    totalQueue > 0 
                     ? 'bg-gradient-to-r from-rose-500 to-orange-600 shadow-xl hover:shadow-2xl hover:scale-[1.01]' 
                     : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 opacity-80'
                 }`}
@@ -389,19 +439,21 @@ export default function App() {
                  <div className="absolute right-0 top-0 h-full w-1/3 bg-white/10 skew-x-12 transform origin-bottom-right"></div>
                  <div className="relative z-10 flex items-center justify-between">
                      <div>
-                         <div className={`text-sm font-bold uppercase tracking-wider mb-2 ${(progress.reviewQueue || []).length > 0 ? 'text-white/80' : 'text-slate-500'}`}>
+                         <div className={`text-sm font-bold uppercase tracking-wider mb-2 ${totalQueue > 0 ? 'text-white/80' : 'text-slate-500'}`}>
                              Fehler-Archiv
                          </div>
-                         <h3 className={`text-3xl font-extrabold mb-1 ${(progress.reviewQueue || []).length > 0 ? 'text-white' : 'text-slate-800 dark:text-white'}`}>
-                            {(progress.reviewQueue || []).length} Fragen offen
+                         <h3 className={`text-3xl font-extrabold mb-1 ${totalQueue > 0 ? 'text-white' : 'text-slate-800 dark:text-white'}`}>
+                            {dueReviewsCount > 0 ? `${dueReviewsCount} Fällig` : `${totalQueue} Archiviert`}
                          </h3>
-                         <p className={`text-sm font-medium ${(progress.reviewQueue || []).length > 0 ? 'text-white/90' : 'text-slate-500'}`}>
-                            {(progress.reviewQueue || []).length > 0 
-                                ? 'Jetzt trainieren und Wissenslücken schließen!' 
-                                : 'Alles sauber! Du hast aktuell keine offenen Fehler.'}
+                         <p className={`text-sm font-medium ${totalQueue > 0 ? 'text-white/90' : 'text-slate-500'}`}>
+                            {dueReviewsCount > 0 
+                                ? 'Jetzt wiederholen und im Gedächtnis verankern!' 
+                                : totalQueue > 0 
+                                    ? `Super! Alle Fragen sind erst später wieder fällig.` 
+                                    : 'Alles sauber! Keine offenen Fehler.'}
                          </p>
                      </div>
-                     <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-lg ${(progress.reviewQueue || []).length > 0 ? 'bg-white text-rose-500' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>
+                     <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-lg ${totalQueue > 0 ? 'bg-white text-rose-500' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>
                          🩹
                      </div>
                  </div>
@@ -418,7 +470,7 @@ export default function App() {
          <div className="flex justify-between items-center mb-4">
              <h3 className="text-xl font-bold text-slate-800 dark:text-white">Fachbereiche (Details & Analyse)</h3>
              {(progress.bookmarks || []).length > 0 && (
-                <button onClick={() => { setFilter({tags:[], difficulty:0, bookmarkOnly:true}); setView('train'); }} className="text-amber-500 hover:text-amber-600 font-bold text-sm flex items-center gap-1">
+                <button onClick={() => { setFilter({tags:[], difficulty:0, bookmarkOnly:true, searchQuery: ""}); setView('train'); }} className="text-amber-500 hover:text-amber-600 font-bold text-sm flex items-center gap-1">
                      ★ {(progress.bookmarks || []).length} Gemerkte
                 </button>
              )}
@@ -523,7 +575,7 @@ export default function App() {
                             </div>
 
                             <button onClick={() => {
-                                setFilter({ tags: detailedStatsGroup.tags, difficulty: 0, bookmarkOnly: false });
+                                setFilter({ tags: detailedStatsGroup.tags, difficulty: 0, bookmarkOnly: false, searchQuery: "" });
                                 setDetailedStatsGroup(null);
                                 setView('train');
                             }} className="w-full py-4 bg-police-600 hover:bg-police-700 text-white rounded-xl font-bold shadow-lg shadow-police-500/20 transition-all active:scale-95 flex justify-center items-center gap-2">
@@ -656,7 +708,7 @@ export default function App() {
                                                         <div className="text-3xl font-black mb-1">{tagStats[0].tag}</div>
                                                         <p className="text-xs opacity-80 mb-4 leading-relaxed">In diesem Bereich hast du die niedrigste Erfolgsquote. Wir empfehlen eine gezielte Trainingseinheit.</p>
                                                         <button onClick={()=>{
-                                                            setFilter({tags: [tagStats[0].tag], difficulty: 0, bookmarkOnly: false});
+                                                            setFilter({tags: [tagStats[0].tag], difficulty: 0, bookmarkOnly: false, searchQuery: ""});
                                                             setDetailedStatsGroup(null);
                                                             setView('train');
                                                         }} className="px-4 py-2 bg-white text-indigo-600 font-bold rounded-lg text-xs shadow hover:bg-indigo-50 transition-colors">
@@ -719,10 +771,10 @@ export default function App() {
                      <h2 className="text-xl font-bold text-rose-600 dark:text-rose-400 flex items-center gap-2">
                         <span>🩹</span> Fehler-Archiv
                      </h2>
-                     <p className="text-sm text-slate-500 dark:text-slate-400">Beantworte Fragen 2x in Folge richtig, um sie zu entfernen.</p>
+                     <p className="text-sm text-slate-500 dark:text-slate-400">Beantworte Fragen richtig, um sie in die Zukunft zu schieben.</p>
                 </div>
                 <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-3 py-1 rounded-full text-sm font-bold">
-                    {reviewQueueCount} übrig
+                    {reviewQueueCount} im System
                 </div>
             </div>
 
@@ -737,7 +789,7 @@ export default function App() {
                 showExplain={showExplain}
                 onBookmark={toggleBookmark}
                 isBookmarked={currentQuestion && (progress.bookmarks || []).includes(currentQuestion.id)}
-                reviewLeft={currentQuestion ? Math.max(0, 2 - (progress.reviewStreak?.[currentQuestion.id] || 0)) : undefined}
+                srsLevel={currentQuestion ? (progress.reviewStreak?.[currentQuestion.id] || 0) : 0}
             />
         </Layout>
       );
@@ -792,6 +844,26 @@ export default function App() {
   // Training View
   return (
     <Layout user={activeUser} onLogout={handleLogout} currentView="train" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+        {/* Search Bar */}
+        <div className="mb-4 relative group">
+             <input 
+                type="text" 
+                placeholder="Fragen durchsuchen (z.B. 'Alkohol', 'Notwehr', '§ 43')..."
+                value={filter.searchQuery}
+                onChange={(e) => setFilter({...filter, searchQuery: e.target.value})}
+                className="w-full pl-10 pr-10 py-3.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-police-500 dark:focus:border-police-500 focus:ring-0 outline-none transition-all shadow-sm text-slate-700 dark:text-slate-200 font-medium group-hover:border-slate-300 dark:group-hover:border-slate-600"
+             />
+             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">🔍</span>
+             {filter.searchQuery && (
+                <button 
+                    onClick={() => setFilter({...filter, searchQuery: ''})}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
+                >
+                    ✕
+                </button>
+             )}
+        </div>
+
         <div className="mb-6 flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
             <button 
                 onClick={() => setFilter({ ...filter, tags: [], bookmarkOnly: false })}
