@@ -79,26 +79,6 @@
     <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Import Map for Gemini SDK -->
-    <script type="importmap">
-{
-  "imports": {
-    "@google/genai": "https://esm.run/@google/genai",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "react/": "https://aistudiocdn.com/react@^19.2.0/"
-  }
-}
-</script>
-
-    <!-- Process Env Shim for API Key -->
-    <script>
-      window.process = window.process || { env: {} };
-      // ⚠️ WICHTIG: Ersetzen Sie den leeren String unten mit Ihrem Gemini API Key, damit der Chat funktioniert.
-      // Lassen Sie dies leer, wenn Sie den Chat nicht nutzen möchten.
-      window.process.env.API_KEY = ""; 
-    </script>
-
     <!-- Styles -->
     <style>
       body { 
@@ -170,15 +150,11 @@
       }
     </style>
 
-    <!-- Firebase SDK Setup & Gemini Loader -->
+    <!-- Firebase SDK Setup -->
     <script type="module">
       import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
       import { getFirestore, collection, doc, writeBatch, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
       import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
-      import { GoogleGenAI } from "@google/genai";
-
-      // Make Gemini available globally for the Babel script
-      window.GoogleGenAI = GoogleGenAI;
 
       const firebaseConfig = {
         apiKey: "AIzaSyDLH5c69JKeFWcJyBpzRUfv720KjnnRIU8",
@@ -212,7 +188,17 @@
       };
       window.dispatchEvent(new Event('firebase-ready'));
     </script>
-  </head>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0"
+  }
+}
+</script>
+</head>
   <body class="bg-animated min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300 selection:bg-police-200 dark:selection:bg-police-900">
     <div id="root"></div>
 
@@ -253,28 +239,6 @@
       const FIRESTORE_USERS = "users";
       const FIRESTORE_PROGRESS = "userProgress";
 
-      const SYSTEM_INSTRUCTION = `
-        Du bist ein erfahrener Ausbildner und KI-Tutor für die österreichische Polizei (E1/E2a Auswahlprüfung und Grundausbildung).
-        Dein Ziel ist es, Anwärter bei der Vorbereitung auf die Prüfung zu unterstützen.
-
-        Deine Spezialgebiete basieren auf folgendem Lehrplan:
-        1. DIENSTRECHT (BDG, Gehaltsgesetz, RGV): Fokus auf Pflichten (§ 43, 44 BDG), Rechte, Ernennung.
-        2. SICHERHEITSPOLIZEI (SPG): Befugnisse, Aufgaben der Sicherheitsbehörden, Organe des öffentlichen Sicherheitsdienstes.
-        3. STRAFRECHT (StGB): Allgemeiner Teil (Vorsatz, Notwehr) und Besonderer Teil (Leib & Leben, Vermögen, Amtspflicht).
-        4. VERKEHRSRECHT (StVO, KFG, FSG): Fahrregeln, Bevorzugte Straßenbenützer, Alkohol, Zulassung, Führerschein.
-        5. VERFASSUNGSRECHT: Grundrechte (EMRK), Staatsorganisation.
-        6. FREMDENRECHT & WAFFENGESETZ.
-
-        Verhaltensregeln:
-        - Antworte präzise, juristisch korrekt, aber verständlich.
-        - Zitiere, wenn möglich, den entsprechenden Paragraphen (§).
-        - Wenn eine Frage unklar ist, frage nach dem Kontext (z.B. "Meinst du im Sinne des SPG oder StPO?").
-        - Sei motivierend, aber streng in der Sache (Polizeiarbeit erfordert Genauigkeit).
-        - Halte die Antworten kompakt, außer der User bittet um eine ausführliche Erklärung.
-
-        Du bist kein Rechtsanwalt, sondern ein Tutor für die Ausbildung.
-      `;
-
       // --- Utils ---
       function hashPassword(str) {
         let hash = 0;
@@ -305,7 +269,10 @@
       // --- Hooks ---
       function useQuestions() {
         const [questions, setQuestionsState] = useState(() => {
-          try { return JSON.parse(localStorage.getItem('questions') || '[]'); } catch { return []; }
+          try { 
+            const d = JSON.parse(localStorage.getItem('questions') || '[]'); 
+            return Array.isArray(d) ? d.filter(q => q && q.id && q.question) : [];
+          } catch { return []; }
         });
         
         useEffect(() => {
@@ -321,7 +288,7 @@
               const remote = [];
               snapshot.forEach(doc => {
                 const d = doc.data();
-                if (!d.__deleted) remote.push({ ...d, id: doc.id });
+                if (!d.__deleted && d.question) remote.push({ ...d, id: doc.id });
               });
               setQuestionsState(prev => {
                 const map = new Map(prev.map(q => [q.id, q]));
@@ -340,7 +307,10 @@
 
       function useUsers() {
         const [users, setUsersState] = useState(() => {
-          try { return JSON.parse(localStorage.getItem('users') || '[]'); } catch { return []; }
+          try { 
+            const d = JSON.parse(localStorage.getItem('users') || '[]'); 
+            return Array.isArray(d) ? d.filter(u => u && u.id && u.username) : [];
+          } catch { return []; }
         });
 
         useEffect(() => { try { localStorage.setItem('users', JSON.stringify(users)); } catch {} }, [users]);
@@ -352,7 +322,10 @@
                 await ensureAuth();
                 return onSnapshot(collection(db, FIRESTORE_USERS), snap => {
                     const remote = [];
-                    snap.forEach(d => remote.push(d.data()));
+                    snap.forEach(d => {
+                        const data = d.data();
+                        if(data && data.username) remote.push(data);
+                    });
                     setUsersState(remote);
                 });
             };
@@ -468,11 +441,11 @@
         const handleRescue = () => {
             const username = prompt("Benutzername für Wiederherstellung:");
             if (!username) return;
-            if (username.toLowerCase() === "hehle") {
+            if ((username || "").toLowerCase() === "hehle") {
                 const secret = prompt("Master-Code eingeben:");
                 if (secret === "polizei") {
                     const newHash = hashPassword("1234");
-                    const user = users.find(u => u.username.toLowerCase() === "hehle");
+                    const user = users.find(u => (u.username || "").toLowerCase() === "hehle");
                     if (user) {
                         upsertUser({ ...user, passwordHash: newHash });
                         alert("Passwort wurde auf '1234' zurückgesetzt.");
@@ -492,11 +465,11 @@
           if (!pass) return setError("Bitte Passwort eingeben");
 
           if (isLogin) {
-            const u = users.find(u => u.username.toLowerCase() === name.toLowerCase());
+            const u = users.find(u => (u.username || "").toLowerCase() === (name || "").toLowerCase());
             if (u && u.passwordHash === hashPassword(pass)) onLogin(u.id);
             else setError("Benutzername oder Passwort falsch.");
           } else {
-            if (users.find(u => u.username.toLowerCase() === name.toLowerCase())) return setError("Name bereits vergeben");
+            if (users.find(u => (u.username || "").toLowerCase() === (name || "").toLowerCase())) return setError("Name bereits vergeben");
             if (pass.length < 4) return setError("Passwort zu kurz (min. 4 Zeichen)");
             if (pass !== confirmPass) return setError("Passwörter stimmen nicht überein");
             
@@ -553,95 +526,6 @@
         );
       }
 
-      // --- Chat Component ---
-      function Chat() {
-        const [messages, setMessages] = useState([
-            { id: 'welcome', role: 'model', text: 'Servus! Ich bin dein KI-Tutor für die E1/E2a Ausbildung. Ich kenne mich bestens mit dem BDG, SPG, StGB und der StVO aus. Was möchtest du heute wiederholen?', timestamp: Date.now() }
-        ]);
-        const [input, setInput] = useState('');
-        const [isLoading, setIsLoading] = useState(false);
-        const scrollRef = useRef(null);
-
-        useEffect(() => {
-            if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: 'smooth' });
-        }, [messages, isLoading]);
-
-        const handleSend = async (e) => {
-            e?.preventDefault();
-            if (!input.trim() || isLoading) return;
-
-            const userText = input;
-            setInput('');
-            const userMsg = { id: Date.now().toString(), role: 'user', text: userText, timestamp: Date.now() };
-            
-            setMessages(prev => [...prev, userMsg]);
-            setIsLoading(true);
-
-            try {
-                if(!window.GoogleGenAI) throw new Error("Gemini SDK not loaded");
-                
-                const apiKey = process.env.API_KEY;
-                
-                if (!apiKey) {
-                    throw new Error("API Key fehlt. Bitte konfiguriere process.env.API_KEY im HTML-Code.");
-                }
-
-                const ai = new window.GoogleGenAI({ apiKey });
-                const history = messages.map(m => ({ role: m.role, parts: [{ text: m.text }] }));
-                
-                const response = await ai.models.generateContent({
-                    model: 'gemini-3-pro-preview',
-                    contents: [...history, { role: 'user', parts: [{ text: userText }] }],
-                    config: { systemInstruction: SYSTEM_INSTRUCTION }
-                });
-
-                const aiText = response.text || "Keine Antwort erhalten.";
-                const aiMsg = { id: (Date.now() + 1).toString(), role: 'model', text: aiText, timestamp: Date.now() };
-                setMessages(prev => [...prev, aiMsg]);
-
-            } catch (error) {
-                console.error("Chat Error", error);
-                let msg = 'Fehler: API Key fehlt oder Verbindungsproblem. (Prüfe die Konsole)';
-                if(error.message && error.message.includes("API Key")) msg = error.message;
-                const errorMsg = { id: (Date.now() + 1).toString(), role: 'model', text: msg, timestamp: Date.now() };
-                setMessages(prev => [...prev, errorMsg]);
-            } finally {
-                setIsLoading(false);
-            }
-        };
-
-        return (
-            <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-100px)]">
-                <div className="mb-4">
-                    <h2 className="text-3xl font-bold text-slate-800 dark:text-white">KI-Tutor</h2>
-                    <p className="text-slate-500 dark:text-slate-400">Stelle Fragen zu BDG, SPG, StVO und mehr.</p>
-                </div>
-                <Card className="flex-1 flex flex-col p-0 overflow-hidden border border-slate-200 dark:border-slate-700 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50/50 dark:bg-slate-950/50">
-                        {messages.map((msg) => {
-                            const isUser = msg.role === 'user';
-                            return (
-                                <div key={msg.id} className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-4 shadow-sm relative ${isUser ? 'bg-gradient-to-br from-police-600 to-indigo-600 text-white rounded-tr-sm' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-tl-sm'}`}>
-                                        <div className={`text-sm md:text-base leading-relaxed whitespace-pre-wrap ${!isUser ? 'ml-2' : ''}`}>{msg.text}</div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        {isLoading && <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl w-fit ml-2 border border-slate-200 dark:border-slate-700"><div className="flex gap-2"><div className="w-2 h-2 bg-police-400 rounded-full animate-bounce"></div><div className="w-2 h-2 bg-police-400 rounded-full animate-bounce delay-100"></div><div className="w-2 h-2 bg-police-400 rounded-full animate-bounce delay-200"></div></div></div>}
-                        <div ref={scrollRef} />
-                    </div>
-                    <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
-                        <form onSubmit={handleSend} className="relative flex items-center gap-2">
-                            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Frage stellen..." className="w-full pl-4 pr-12 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-police-500 outline-none transition-all shadow-inner text-slate-800 dark:text-slate-100" disabled={isLoading} />
-                            <button type="submit" disabled={!input.trim() || isLoading} className="absolute right-2 p-2 bg-police-600 hover:bg-police-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-lg transition-colors shadow-md">➤</button>
-                        </form>
-                    </div>
-                </Card>
-            </div>
-        );
-      }
-
       function Layout({ children, user, onLogout, currentView, setView, theme, toggleTheme }) {
         if (!user) {
           return (
@@ -690,14 +574,13 @@
               <nav className="space-y-3 flex-1">
                 <NavItem id="dashboard" label="Dashboard" icon="📊" />
                 <NavItem id="train" label="Training" icon="🎯" />
-                <NavItem id="chat" label="KI-Tutor" icon="💬" />
                 <NavItem id="exam" label="Prüfung" icon="📝" />
                 {user.role === 'admin' && <NavItem id="admin" label="Verwaltung" icon="⚡" />}
               </nav>
               <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50 space-y-3">
                  <div className="px-4 py-3 bg-white/50 dark:bg-slate-800/50 rounded-xl mb-2 flex items-center gap-3 border border-slate-100 dark:border-slate-700">
                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs shadow-md">
-                     {user.username.charAt(0).toUpperCase()}
+                     {(user.username || "?").charAt(0).toUpperCase()}
                    </div>
                    <div className="overflow-hidden">
                      <div className="font-semibold text-sm truncate dark:text-slate-200">{user.username}</div>
@@ -718,7 +601,6 @@
                 <div className="glass-card rounded-2xl p-2 flex justify-around shadow-2xl border border-white/50">
                     <button onClick={() => setView('dashboard')} className={`p-3 rounded-xl transition-all ${currentView === 'dashboard' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>📊</button>
                     <button onClick={() => setView('train')} className={`p-3 rounded-xl transition-all ${currentView === 'train' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>🎯</button>
-                    <button onClick={() => setView('chat')} className={`p-3 rounded-xl transition-all ${currentView === 'chat' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>💬</button>
                     <button onClick={() => setView('exam')} className={`p-3 rounded-xl transition-all ${currentView === 'exam' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>📝</button>
                     {user.role === 'admin' && <button onClick={() => setView('admin')} className={`p-3 rounded-xl transition-all ${currentView === 'admin' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>⚡</button>}
                     <button onClick={onLogout} className="p-3 rounded-xl text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20">🚪</button>
@@ -1015,7 +897,7 @@
             return { ...g, total: gQ.length, attempted: att, correct: corr };
         }), [questions, progress]);
 
-        if (!activeUser) return <Layout user={null}><AuthForm users={users} onLogin={handleLogin} onRegister={(u) => { upsertUser(u); handleLogin(u.id); }} upsertUser={upsertUser} /></Layout>;
+        if (!activeUser) return <Layout user={null}><AuthForm users={users} onLogin={handleLogin} onRegister={(u) => { upsertUser(u); handleLogin(u.id); }} upsertUser={upsertUser} hashPassword={hashPassword} /></Layout>;
 
         if (view === 'admin') return (
             <Layout user={activeUser} onLogout={handleLogout} currentView="admin" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
@@ -1041,7 +923,7 @@
                             </div>
                         ) : (
                             <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-[500px]">
-                                {questions.filter(q => q.question.toLowerCase().includes(adminSearch.toLowerCase()) || q.id.includes(adminSearch)).map(q => (
+                                {questions.filter(q => (q.question || "").toLowerCase().includes((adminSearch || "").toLowerCase()) || (q.id || "").includes(adminSearch)).map(q => (
                                     <div key={q.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex justify-between gap-4 group bg-white dark:bg-slate-800">
                                         <div className="min-w-0">
                                             <div className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{q.question}</div>
@@ -1143,14 +1025,6 @@
                    </div>
                    <Quiz question={currentQuestion} idx={quizIdx} score={score} streak={streak} onAnswer={handleAnswer} onNext={()=>{}} onSkip={()=>{}} showExplain={false} onBookmark={toggleBookmark} isBookmarked={currentQuestion && (progress.bookmarks||[]).includes(currentQuestion.id)} mode="exam" />
                 </Layout>
-            );
-        }
-
-        if (view === 'chat') {
-            return (
-              <Layout user={activeUser} onLogout={handleLogout} currentView="chat" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
-                 <Chat />
-              </Layout>
             );
         }
 
