@@ -318,7 +318,7 @@ export default function App() {
              <StatCard label="Trefferquote" value={`${progress.totalAttempts ? Math.round((progress.totalCorrect/progress.totalAttempts)*100) : 0}%`} icon="🎯" color="emerald" />
          </div>
 
-         <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-white">Fachbereiche (Details durch Klick)</h3>
+         <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-white">Fachbereiche (Analyse & Details)</h3>
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {stats.map(s => {
                 const percentage = s.total ? Math.round((s.correct / Math.max(s.attempted, 1)) * 100) : 0;
@@ -326,32 +326,35 @@ export default function App() {
                 return (
                     <GlassCard 
                         key={s.key} 
-                        className="p-6 cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all relative group"
+                        className="p-6 cursor-pointer hover:shadow-xl hover:translate-y-[-4px] transition-all relative group border-l-4"
+                        style={{ borderLeftColor: `var(--color-${s.color}-500)` }}
                         onClick={() => setDetailedStatsGroup(s)} // Trigger Modal
                     >
-                         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400">
-                             ↗
+                         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-police-500 bg-police-50 dark:bg-police-900/50 p-2 rounded-lg">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                             </svg>
                          </div>
                         <div className="flex justify-between items-start mb-4">
                             <div>
-                                <h4 className={`font-bold text-lg text-${s.color}-600 dark:text-${s.color}-400`}>{s.title}</h4>
-                                <p className="text-sm text-slate-500">{s.attempted} / {s.total} Fragen bearbeitet</p>
-                            </div>
-                            <div className={`w-10 h-10 rounded-full bg-${s.color}-100 dark:bg-${s.color}-900/30 flex items-center justify-center text-${s.color}-600`}>
-                                {percentage}%
+                                <h4 className={`font-bold text-lg text-slate-800 dark:text-white`}>{s.title}</h4>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-xs font-bold bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500">{s.key}</span>
+                                    <span className="text-xs text-slate-400">{s.attempted} / {s.total} Fragen</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             <div>
-                                <div className="flex justify-between text-xs mb-1"><span>Wissensstand</span></div>
-                                <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
-                                    <div className={`bg-${s.color}-500 h-2 rounded-full transition-all duration-1000`} style={{width: `${percentage}%`}}></div>
+                                <div className="flex justify-between text-xs mb-1.5 font-semibold text-slate-500"><span>Wissensstand</span> <span>{percentage}%</span></div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
+                                    <div className={`bg-${s.color}-500 h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(0,0,0,0.1)]`} style={{width: `${percentage}%`}}></div>
                                 </div>
                             </div>
                             <div>
-                                <div className="flex justify-between text-xs mb-1"><span>Abdeckung</span></div>
-                                <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2">
-                                    <div className="bg-slate-400 h-2 rounded-full transition-all duration-1000" style={{width: `${coverage}%`}}></div>
+                                <div className="flex justify-between text-xs mb-1.5 font-semibold text-slate-500"><span>Abdeckung</span> <span>{coverage}%</span></div>
+                                <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+                                    <div className="bg-slate-300 dark:bg-slate-500 h-full rounded-full transition-all duration-1000" style={{width: `${coverage}%`}}></div>
                                 </div>
                             </div>
                         </div>
@@ -360,89 +363,171 @@ export default function App() {
             })}
          </div>
 
-         {/* Detailed Stats Modal */}
+         {/* Detailed Analysis Modal */}
          {detailedStatsGroup && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setDetailedStatsGroup(null)}>
-                <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl animate-slide-up overflow-hidden" onClick={e => e.stopPropagation()}>
-                    <div className={`p-6 border-b border-slate-100 dark:border-slate-700 bg-${detailedStatsGroup.color}-50 dark:bg-${detailedStatsGroup.color}-900/20 flex justify-between items-center`}>
-                        <h3 className={`text-xl font-bold text-${detailedStatsGroup.color}-700 dark:text-${detailedStatsGroup.color}-400`}>{detailedStatsGroup.title} - Details</h3>
-                        <button onClick={() => setDetailedStatsGroup(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+            <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in" onClick={() => setDetailedStatsGroup(null)}>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-700 animate-slide-up overflow-hidden" onClick={e => e.stopPropagation()}>
+                    
+                    {/* Modal Header */}
+                    <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-slate-50 dark:bg-slate-950">
+                        <div className="flex items-center gap-6">
+                            <div className={`w-20 h-20 rounded-2xl bg-${detailedStatsGroup.color}-100 dark:bg-${detailedStatsGroup.color}-900/20 flex items-center justify-center text-4xl shadow-inner`}>
+                                {detailedStatsGroup.attempted > 0 && detailedStatsGroup.correct / Math.max(detailedStatsGroup.attempted, 1) > 0.8 ? '🌟' : '📊'}
+                            </div>
+                            <div>
+                                <div className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Analyse</div>
+                                <h2 className="text-3xl font-extrabold text-slate-800 dark:text-white mb-2">{detailedStatsGroup.title}</h2>
+                                <div className="flex gap-4 text-sm font-medium text-slate-500">
+                                    <span>{detailedStatsGroup.total} Fragen Gesamt</span>
+                                    <span className="w-px h-4 bg-slate-300 dark:bg-slate-700"></span>
+                                    <span>{detailedStatsGroup.attempted} Bearbeitet</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button onClick={() => setDetailedStatsGroup(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:text-rose-500 transition-all shadow-sm">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
                     </div>
                     
-                    <div className="overflow-y-auto p-6 space-y-8">
-                        {(() => {
-                            // Filter questions for this group
-                            const groupQuestions = questions.filter(q => q.tags.some(t => detailedStatsGroup.tags.includes(t)));
-                            
-                            // Categorize
-                            const perfect = groupQuestions.filter(q => {
-                                const att = progress.attemptedIds[q.id] || 0;
-                                const corr = progress.correctIds[q.id] || 0;
-                                return att > 0 && att === corr;
-                            });
-
-                            const needsPractice = groupQuestions.filter(q => {
-                                const att = progress.attemptedIds[q.id] || 0;
-                                const corr = progress.correctIds[q.id] || 0;
-                                return att > 0 && att > corr;
-                            });
-
-                            const untouched = groupQuestions.filter(q => !progress.attemptedIds[q.id]);
-
-                            const ListSection = ({ title, items, icon, colorClass, emptyText }: any) => (
-                                <div>
-                                    <h4 className={`text-sm font-bold uppercase tracking-wider mb-3 flex items-center gap-2 ${colorClass}`}>
-                                        {icon} {title} ({items.length})
-                                    </h4>
-                                    {items.length === 0 ? (
-                                        <p className="text-sm text-slate-400 italic">{emptyText}</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {items.map((q: Question) => {
-                                                 const att = progress.attemptedIds[q.id] || 0;
-                                                 const corr = progress.correctIds[q.id] || 0;
-                                                 return (
-                                                    <div key={q.id} className="p-3 rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center gap-4">
-                                                        <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{q.question}</div>
-                                                        {att > 0 && (
-                                                            <div className="text-xs font-mono shrink-0 text-slate-500">
-                                                                {corr}/{att} ✓
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                 )
-                                            })}
-                                        </div>
-                                    )}
+                    <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
+                        {/* Sidebar / KPIs */}
+                        <div className="w-full md:w-72 bg-slate-50/50 dark:bg-slate-900/50 border-r border-slate-100 dark:border-slate-800 p-6 overflow-y-auto">
+                            <h4 className="font-bold text-slate-800 dark:text-white mb-6">Leistungsdaten</h4>
+                            <div className="space-y-4">
+                                <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                    <div className="text-xs text-slate-500 uppercase font-bold mb-1">Erfolgsquote</div>
+                                    <div className={`text-3xl font-black text-${detailedStatsGroup.color}-600`}>
+                                        {detailedStatsGroup.attempted ? Math.round((detailedStatsGroup.correct / detailedStatsGroup.attempted) * 100) : 0}%
+                                    </div>
+                                    <div className="text-xs text-slate-400 mt-1">Basierend auf allen Versuchen</div>
                                 </div>
-                            );
+                                <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                    <div className="text-xs text-slate-500 uppercase font-bold mb-1">Fehlerrate</div>
+                                    <div className="text-3xl font-black text-rose-500">
+                                        {detailedStatsGroup.attempted ? (100 - Math.round((detailedStatsGroup.correct / detailedStatsGroup.attempted) * 100)) : 0}%
+                                    </div>
+                                </div>
+                                <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                    <div className="text-xs text-slate-500 uppercase font-bold mb-1">Ungesehen</div>
+                                    <div className="text-3xl font-black text-slate-400">
+                                        {detailedStatsGroup.total - (questions.filter(q => q.tags.some(t => detailedStatsGroup.tags.includes(t)) && progress.attemptedIds[q.id]).length)}
+                                    </div>
+                                    <div className="text-xs text-slate-400 mt-1">Fragen noch offen</div>
+                                </div>
+                            </div>
+                            
+                            <button onClick={() => {
+                                setFilter({ tags: detailedStatsGroup.tags, difficulty: 0 });
+                                setDetailedStatsGroup(null);
+                                setView('train');
+                            }} className="w-full mt-8 py-3 bg-police-600 hover:bg-police-700 text-white rounded-xl font-bold shadow-lg shadow-police-500/20 transition-all active:scale-95">
+                                Bereich trainieren
+                            </button>
+                        </div>
 
-                            return (
-                                <>
-                                    <ListSection 
-                                        title="Sicher beherrscht" 
-                                        items={perfect} 
-                                        icon="✅" 
-                                        colorClass="text-emerald-600 dark:text-emerald-400" 
-                                        emptyText="Noch keine Fragen fehlerfrei beantwortet." 
-                                    />
-                                    <ListSection 
-                                        title="Wiederholungsbedarf" 
-                                        items={needsPractice} 
-                                        icon="⚠️" 
-                                        colorClass="text-rose-600 dark:text-rose-400" 
-                                        emptyText="Super! Keine offenen Fehler in diesem Bereich." 
-                                    />
-                                    <ListSection 
-                                        title="Noch offen" 
-                                        items={untouched} 
-                                        icon="⚪" 
-                                        colorClass="text-slate-500 dark:text-slate-400" 
-                                        emptyText="Alle Fragen dieses Bereichs wurden mindestens einmal bearbeitet." 
-                                    />
-                                </>
-                            );
-                        })()}
+                        {/* Content Area */}
+                        <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-900 p-6 md:p-8">
+                             {(() => {
+                                // Logic to sort questions
+                                const groupQs = questions.filter(q => q.tags.some(t => detailedStatsGroup.tags.includes(t)));
+                                
+                                const critical = groupQs.filter(q => {
+                                    const att = progress.attemptedIds[q.id] || 0;
+                                    const corr = progress.correctIds[q.id] || 0;
+                                    return att > 0 && (corr / att) <= 0.6; // High error rate
+                                });
+
+                                const stable = groupQs.filter(q => {
+                                    const att = progress.attemptedIds[q.id] || 0;
+                                    const corr = progress.correctIds[q.id] || 0;
+                                    return att > 0 && (corr / att) > 0.6 && (corr / att) < 1;
+                                });
+
+                                const mastered = groupQs.filter(q => {
+                                    const att = progress.attemptedIds[q.id] || 0;
+                                    const corr = progress.correctIds[q.id] || 0;
+                                    return att > 0 && att === corr;
+                                });
+                                
+                                const unseen = groupQs.filter(q => !progress.attemptedIds[q.id]);
+
+                                const Section = ({ title, items, color, info }: any) => (
+                                    <div className="mb-10">
+                                        <div className="flex items-baseline justify-between mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+                                            <h4 className={`text-lg font-bold ${color}`}>{title} <span className="text-sm opacity-60 ml-2">({items.length})</span></h4>
+                                            <span className="text-xs text-slate-400 hidden md:inline">{info}</span>
+                                        </div>
+                                        {items.length === 0 ? (
+                                            <div className="text-sm text-slate-400 italic py-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-center">Keine Fragen in dieser Kategorie.</div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 gap-3">
+                                                {items.map((q: Question) => {
+                                                     const att = progress.attemptedIds[q.id] || 0;
+                                                     const corr = progress.correctIds[q.id] || 0;
+                                                     const rate = att ? Math.round((corr/att)*100) : 0;
+                                                     
+                                                     return (
+                                                        <div key={q.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
+                                                            <div className="flex-1">
+                                                                <div className="font-medium text-slate-800 dark:text-slate-200 text-sm md:text-base">{q.question}</div>
+                                                                <div className="flex gap-2 mt-2">
+                                                                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-700 text-slate-500 rounded text-[10px] font-bold uppercase">Lvl {q.difficulty}</span>
+                                                                    <span className="px-2 py-0.5 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 rounded text-[10px] font-bold font-mono">§ {q.law_ref}</span>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            {att > 0 && (
+                                                                <div className="w-full md:w-48 shrink-0">
+                                                                    <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                                                                        <span>{rate}% Korrekt</span>
+                                                                        <span>{corr}/{att}</span>
+                                                                    </div>
+                                                                    <div className="w-full h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                                        <div 
+                                                                            className={`h-full rounded-full ${rate >= 80 ? 'bg-emerald-500' : rate >= 50 ? 'bg-amber-400' : 'bg-rose-500'}`} 
+                                                                            style={{width: `${rate}%`}}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                     )
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+
+                                return (
+                                    <div className="animate-fade-in space-y-2">
+                                        <Section 
+                                            title="⚠️ Kritisch / Fokusbereich" 
+                                            items={critical} 
+                                            color="text-rose-600" 
+                                            info="Hohe Fehlerrate – dringend wiederholen!"
+                                        />
+                                        <Section 
+                                            title="🔄 In Arbeit" 
+                                            items={stable} 
+                                            color="text-amber-500"
+                                            info="Teilweise richtig, aber noch nicht sattelfest."
+                                        />
+                                        <Section 
+                                            title="✅ Gemeistert" 
+                                            items={mastered} 
+                                            color="text-emerald-600"
+                                            info="Fehlerfrei beantwortet."
+                                        />
+                                        <Section 
+                                            title="⚪ Neu / Unbekannt" 
+                                            items={unseen} 
+                                            color="text-slate-500"
+                                            info="Noch nie bearbeitet."
+                                        />
+                                    </div>
+                                );
+                             })()}
+                        </div>
                     </div>
                 </div>
             </div>
