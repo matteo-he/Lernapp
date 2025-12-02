@@ -12,6 +12,8 @@ interface QuizProps {
   onSkip: () => void;
   showExplain: boolean;
   mode?: string;
+  onBookmark?: (id: string) => void;
+  isBookmarked?: boolean;
 }
 
 // Helper for shuffling
@@ -48,7 +50,10 @@ function seededShuffle(array: number[], seedStr: string) {
   return a;
 }
 
-export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnswer, onNext, onSkip, showExplain, mode = 'training' }) => {
+export const Quiz: React.FC<QuizProps> = ({ 
+    question, idx, score, streak, onAnswer, onNext, onSkip, showExplain, 
+    mode = 'training', onBookmark, isBookmarked 
+}) => {
   const [selected, setSelected] = useState<number[]>([]);
 
   useEffect(() => {
@@ -110,6 +115,14 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
             </span>
         </div>
         <div className="flex items-center gap-4">
+             {onBookmark && (
+                <button 
+                  onClick={() => onBookmark(question.id)}
+                  className={`text-2xl transition-transform active:scale-90 ${isBookmarked ? 'text-yellow-400 scale-110' : 'text-slate-300 hover:text-yellow-400'}`}
+                >
+                  {isBookmarked ? '★' : '☆'}
+                </button>
+             )}
              {mode === 'training' && (
                <div className="flex flex-col items-end">
                    <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Streak</span>
@@ -151,8 +164,8 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
                             indicator = <div className="w-6 h-6 rounded-md bg-emerald-500 text-white flex items-center justify-center shadow-sm">✓</div>;
                         } else if (isSelected && !isCorrect) {
                             // User selected it, but it's wrong
-                            containerClass = "border-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-500/50";
-                            textClass = "text-rose-900 dark:text-rose-100 opacity-80 decoration-rose-500/30";
+                            containerClass = "border-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-500/50 opacity-90";
+                            textClass = "text-rose-900 dark:text-rose-100 opacity-80 decoration-rose-500/30 line-through";
                             indicator = <div className="w-6 h-6 rounded-md bg-rose-500 text-white flex items-center justify-center shadow-sm font-bold">✕</div>;
                         } else {
                             // Not selected, not correct (irrelevant)
@@ -178,9 +191,10 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
                 })}
             </div>
 
-            <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap gap-4 justify-between items-center">
+            {/* Consolidated Feedback & Actions Area */}
+            <div className="mt-8 pt-2">
                 {!showExplain ? (
-                    <>
+                    <div className="flex flex-wrap gap-4 justify-between items-center border-t border-slate-100 dark:border-slate-700/50 pt-6">
                         <button onClick={onSkip} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 font-bold px-4 py-2 transition-colors text-sm uppercase tracking-wide">
                             Überspringen
                         </button>
@@ -191,36 +205,46 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
                         >
                             Prüfen
                         </button>
-                    </>
+                    </div>
                 ) : (
-                    <div className="w-full animate-fade-in space-y-4">
-                        <div className={`rounded-xl p-5 border-l-4 ${isCorrectAnswer ? 'bg-emerald-50 border-emerald-500 dark:bg-emerald-900/10' : 'bg-rose-50 border-rose-500 dark:bg-rose-900/10'}`}>
-                             <div className="flex items-center gap-3 mb-2">
-                                <span className={`text-2xl ${isCorrectAnswer ? 'animate-bounce' : 'animate-pulse'}`}>{isCorrectAnswer ? '🎉' : '🤔'}</span>
-                                <h4 className={`font-black text-lg ${isCorrectAnswer ? 'text-emerald-800 dark:text-emerald-400' : 'text-rose-800 dark:text-rose-400'}`}>
-                                    {isCorrectAnswer ? 'Exakt richtig!' : 'Nicht ganz...'}
-                                </h4>
-                             </div>
-                             {!isCorrectAnswer && <p className="text-sm text-rose-700 dark:text-rose-300 mb-2 font-medium">Sieh dir die markierte korrekte Lösung an.</p>}
-                        </div>
-
-                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-xl p-6 border border-slate-200 dark:border-slate-700 relative overflow-hidden">
-                            <div className="absolute top-0 right-0 p-4 opacity-5 text-6xl">💡</div>
-                            <h4 className="font-bold text-slate-800 dark:text-white mb-3 flex items-center gap-2 relative z-10">
-                                Erklärung
-                            </h4>
-                            <p className="text-slate-600 dark:text-slate-300 leading-relaxed mb-4 relative z-10 text-base">{question.explain}</p>
-                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800/50 text-indigo-700 dark:text-indigo-300 text-xs font-bold font-mono uppercase tracking-wide relative z-10">
-                                <span>§</span> {question.law_ref}
+                    <div className="animate-fade-in-up">
+                         {/* Integrated Feedback Card */}
+                         <div className={`rounded-2xl p-6 border-2 shadow-xl ${isCorrectAnswer ? 'bg-emerald-50 border-emerald-500/20' : 'bg-rose-50 border-rose-500/20'}`}>
+                            <div className="flex items-center gap-4 mb-5 border-b border-black/5 pb-4">
+                                <div className={`text-4xl filter drop-shadow-sm ${isCorrectAnswer ? 'animate-bounce' : 'animate-pulse'}`}>
+                                    {isCorrectAnswer ? '🎉' : '❌'}
+                                </div>
+                                <div>
+                                    <h3 className={`text-xl font-black ${isCorrectAnswer ? 'text-emerald-800 dark:text-emerald-400' : 'text-rose-800 dark:text-rose-400'}`}>
+                                        {isCorrectAnswer ? 'Hervorragend!' : 'Leider falsch'}
+                                    </h3>
+                                    <p className={`text-sm font-medium ${isCorrectAnswer ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}>
+                                        {isCorrectAnswer ? 'Die Antwort ist absolut korrekt.' : 'Sieh dir die Lösung genau an.'}
+                                    </p>
+                                </div>
                             </div>
-                        </div>
+                            
+                            <div className="prose prose-sm dark:prose-invert max-w-none">
+                                 <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 m-0 text-base">
+                                        💡 Erklärung
+                                    </h4>
+                                    <span className="text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 px-2 py-1 rounded text-slate-500 dark:text-slate-400 font-mono font-bold">
+                                        § {question.law_ref}
+                                    </span>
+                                 </div>
+                                 <p className="text-slate-600 dark:text-slate-300 text-base leading-relaxed m-0">
+                                    {question.explain}
+                                 </p>
+                            </div>
 
-                        <button 
-                            onClick={onNext}
-                            className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white px-6 py-4 rounded-xl font-bold text-lg hover:shadow-xl hover:scale-[1.01] transition-all flex items-center justify-center gap-2 group mt-4"
-                        >
-                            Weiter <span className="group-hover:translate-x-1 transition-transform">➔</span>
-                        </button>
+                            <button 
+                                onClick={onNext}
+                                className="w-full mt-6 py-4 rounded-xl bg-slate-900 dark:bg-white dark:text-slate-900 text-white font-bold text-lg shadow-lg hover:shadow-xl hover:scale-[1.01] transition-all flex justify-center items-center gap-2 group"
+                            >
+                                Weiter <span className="group-hover:translate-x-1 transition-transform">➔</span>
+                            </button>
+                         </div>
                     </div>
                 )}
             </div>
