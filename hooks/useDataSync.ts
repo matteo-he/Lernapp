@@ -129,9 +129,21 @@ export function useUsers() {
 export function useProgress(userId: string | null) {
     const key = userId ? `progress:${userId}` : null;
     const [progress, setProgress] = useState<UserProgress>(() => {
-        if (!key) return { totalAttempts: 0, totalCorrect: 0, attemptedIds: {}, correctIds: {} };
-        try { return JSON.parse(localStorage.getItem(key) || 'null') || { totalAttempts: 0, totalCorrect: 0, attemptedIds: {}, correctIds: {} }; } 
-        catch { return { totalAttempts: 0, totalCorrect: 0, attemptedIds: {}, correctIds: {} }; }
+        const defaultState: UserProgress = { 
+            totalAttempts: 0, 
+            totalCorrect: 0, 
+            attemptedIds: {}, 
+            correctIds: {},
+            bookmarks: [],
+            reviewQueue: [],
+            reviewStreak: {}
+        };
+        if (!key) return defaultState;
+        try { 
+            const saved = JSON.parse(localStorage.getItem(key) || 'null');
+            return saved || defaultState;
+        } 
+        catch { return defaultState; }
     });
 
     const applyingRemote = useRef(false);
@@ -152,11 +164,17 @@ export function useProgress(userId: string | null) {
             unsub = onSnapshot(docRef, (snap: any) => {
                 if (snap.exists()) {
                     const data = snap.data();
-                    // Assume data is stored under a key or directly
-                    const remoteProg = data[`${userId}:metrics`] || data; // Adapting to old format possibility
+                    const remoteProg = data[`${userId}:metrics`] || data; 
                     if (remoteProg && remoteProg.totalAttempts !== undefined) {
                         applyingRemote.current = true;
-                        setProgress(remoteProg);
+                        setProgress(prev => ({
+                            ...prev, // Keep local defaults
+                            ...remoteProg,
+                            // Ensure arrays exist if remote didn't have them
+                            bookmarks: remoteProg.bookmarks || [],
+                            reviewQueue: remoteProg.reviewQueue || [],
+                            reviewStreak: remoteProg.reviewStreak || {}
+                        }));
                         applyingRemote.current = false;
                     }
                 }
@@ -174,7 +192,6 @@ export function useProgress(userId: string | null) {
             if (userId && dbInstance && !applyingRemote.current) {
                 const payload = next;
                 ensureAuth().then(() => {
-                    // Storing with the specific key format from legacy app to maintain compatibility
                     setDoc(doc(dbInstance, FIRESTORE_PROGRESS, userId), { [`${userId}:metrics`]: payload }, { merge: true });
                 });
             }

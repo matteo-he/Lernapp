@@ -23,11 +23,15 @@ export interface UserProgress {
   totalCorrect: number;
   attemptedIds: Record<string, number>;
   correctIds: Record<string, number>;
+  bookmarks?: string[];
+  reviewQueue?: string[];
+  reviewStreak?: Record<string, number>;
 }
 
 export interface FilterState {
   tags: string[];
   difficulty: number;
+  bookmarkOnly: boolean;
 }
 
 export interface ChatMessage {

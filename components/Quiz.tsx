@@ -14,6 +14,7 @@ interface QuizProps {
   mode?: string;
   onBookmark?: (id: string) => void;
   isBookmarked?: boolean;
+  reviewLeft?: number;
 }
 
 // Helper for shuffling
@@ -62,7 +63,7 @@ const BADGE_COLORS: Record<string, string> = {
 
 export const Quiz: React.FC<QuizProps> = ({ 
     question, idx, score, streak, onAnswer, onNext, onSkip, showExplain, 
-    mode = 'training', onBookmark, isBookmarked 
+    mode = 'training', onBookmark, isBookmarked, reviewLeft 
 }) => {
   const [selected, setSelected] = useState<number[]>([]);
 
@@ -124,6 +125,11 @@ export const Quiz: React.FC<QuizProps> = ({
             <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium border border-slate-200 dark:border-slate-700">
                 Level {question.difficulty}
             </span>
+            {reviewLeft !== undefined && (
+                <span className="px-3 py-1 rounded-full bg-rose-500 text-white text-xs font-bold border border-rose-600 animate-pulse">
+                    Noch {reviewLeft}x richtig
+                </span>
+            )}
         </div>
         <div className="flex items-center gap-4">
              {onBookmark && (

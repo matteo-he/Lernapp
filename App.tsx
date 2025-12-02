@@ -99,13 +99,17 @@ export default function App() {
 
   const getCandidateQuestions = useMemo(() => {
       let q = questions;
+      if (view === 'review') {
+          return q.filter(x => (progress.reviewQueue || []).includes(x.id));
+      }
+
       if (filter.bookmarkOnly) {
           q = q.filter(x => (progress.bookmarks || []).includes(x.id));
       } else if (filter.tags.length > 0) {
           q = q.filter(x => x.tags.some(t => filter.tags.includes(t)));
       }
       return q;
-  }, [questions, filter, progress.bookmarks]);
+  }, [questions, filter, progress.bookmarks, progress.reviewQueue, view]);
 
   const handleAnswer = (selectedIndices: number[]) => {
     if (showExplain || !currentQuestion) return;
@@ -160,12 +164,39 @@ export default function App() {
         const correctIds = { ...prev.correctIds };
         if (isCorrect) correctIds[currentQuestion.id] = (correctIds[currentQuestion.id] || 0) + 1;
         
+        // Smart Review (Fehler-Archiv) Logic
+        let reviewQueue = prev.reviewQueue ? [...prev.reviewQueue] : [];
+        let reviewStreak = prev.reviewStreak ? { ...prev.reviewStreak } : {};
+        
+        if (!isCorrect) {
+             // Wrong answer: Add to queue if not present
+             if (!reviewQueue.includes(currentQuestion.id)) {
+                 reviewQueue.push(currentQuestion.id);
+             }
+             // Reset review streak
+             reviewStreak[currentQuestion.id] = 0;
+        } else {
+             // Correct answer
+             if (reviewQueue.includes(currentQuestion.id)) {
+                 const currentS = reviewStreak[currentQuestion.id] || 0;
+                 const newS = currentS + 1;
+                 reviewStreak[currentQuestion.id] = newS;
+                 
+                 // Remove if correct 2 times in a row
+                 if (newS >= 2) {
+                     reviewQueue = reviewQueue.filter(id => id !== currentQuestion.id);
+                 }
+             }
+        }
+
         return {
             ...prev,
             totalAttempts: prev.totalAttempts + 1,
             totalCorrect: prev.totalCorrect + (isCorrect ? 1 : 0),
             attemptedIds,
-            correctIds
+            correctIds,
+            reviewQueue,
+            reviewStreak
         };
     });
   };
@@ -337,12 +368,44 @@ export default function App() {
             </div>
             <div className="flex gap-2">
                 {activeUser.role === 'admin' && <button onClick={() => setView('admin')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-xl text-sm font-bold">Verwaltung</button>}
-                {(progress.bookmarks || []).length > 0 && (
-                    <button onClick={() => { setFilter({tags:[], difficulty:0, bookmarkOnly:true}); setView('train'); }} className="px-6 py-3 rounded-2xl bg-amber-100 text-amber-800 font-bold shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 hover:scale-105 transition-all flex items-center gap-2">
-                        <span>★</span> {(progress.bookmarks || []).length} Gemerkte Fragen üben
-                    </button>
-                )}
             </div>
+         </div>
+
+         {/* Smart Review Card */}
+         <div className="mb-8">
+             <div 
+                onClick={() => {
+                    if((progress.reviewQueue || []).length > 0) {
+                        setView('review');
+                        setQuizIdx(0);
+                    }
+                }}
+                className={`relative overflow-hidden rounded-2xl p-6 md:p-8 cursor-pointer transition-all duration-300 ${
+                    (progress.reviewQueue || []).length > 0 
+                    ? 'bg-gradient-to-r from-rose-500 to-orange-600 shadow-xl hover:shadow-2xl hover:scale-[1.01]' 
+                    : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 opacity-80'
+                }`}
+             >
+                 <div className="absolute right-0 top-0 h-full w-1/3 bg-white/10 skew-x-12 transform origin-bottom-right"></div>
+                 <div className="relative z-10 flex items-center justify-between">
+                     <div>
+                         <div className={`text-sm font-bold uppercase tracking-wider mb-2 ${(progress.reviewQueue || []).length > 0 ? 'text-white/80' : 'text-slate-500'}`}>
+                             Fehler-Archiv
+                         </div>
+                         <h3 className={`text-3xl font-extrabold mb-1 ${(progress.reviewQueue || []).length > 0 ? 'text-white' : 'text-slate-800 dark:text-white'}`}>
+                            {(progress.reviewQueue || []).length} Fragen offen
+                         </h3>
+                         <p className={`text-sm font-medium ${(progress.reviewQueue || []).length > 0 ? 'text-white/90' : 'text-slate-500'}`}>
+                            {(progress.reviewQueue || []).length > 0 
+                                ? 'Jetzt trainieren und Wissenslücken schließen!' 
+                                : 'Alles sauber! Du hast aktuell keine offenen Fehler.'}
+                         </p>
+                     </div>
+                     <div className={`w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-lg ${(progress.reviewQueue || []).length > 0 ? 'bg-white text-rose-500' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>
+                         🩹
+                     </div>
+                 </div>
+             </div>
          </div>
 
          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -352,7 +415,15 @@ export default function App() {
              <StatCard label="Trefferquote" value={`${progress.totalAttempts ? Math.round((progress.totalCorrect/progress.totalAttempts)*100) : 0}%`} icon="🎯" color="emerald" />
          </div>
 
-         <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-white">Fachbereiche (Details & Analyse)</h3>
+         <div className="flex justify-between items-center mb-4">
+             <h3 className="text-xl font-bold text-slate-800 dark:text-white">Fachbereiche (Details & Analyse)</h3>
+             {(progress.bookmarks || []).length > 0 && (
+                <button onClick={() => { setFilter({tags:[], difficulty:0, bookmarkOnly:true}); setView('train'); }} className="text-amber-500 hover:text-amber-600 font-bold text-sm flex items-center gap-1">
+                     ★ {(progress.bookmarks || []).length} Gemerkte
+                </button>
+             )}
+         </div>
+         
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {stats.map(s => {
                 const percentage = s.total ? Math.round((s.correct / Math.max(s.attempted, 1)) * 100) : 0;
@@ -635,6 +706,41 @@ export default function App() {
          )}
       </Layout>
     );
+  }
+
+  // Review View (Fehler-Archiv)
+  if (view === 'review') {
+      const reviewQueueCount = (progress.reviewQueue || []).length;
+      
+      return (
+        <Layout user={activeUser} onLogout={handleLogout} currentView="dashboard" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                     <h2 className="text-xl font-bold text-rose-600 dark:text-rose-400 flex items-center gap-2">
+                        <span>🩹</span> Fehler-Archiv
+                     </h2>
+                     <p className="text-sm text-slate-500 dark:text-slate-400">Beantworte Fragen 2x in Folge richtig, um sie zu entfernen.</p>
+                </div>
+                <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-3 py-1 rounded-full text-sm font-bold">
+                    {reviewQueueCount} übrig
+                </div>
+            </div>
+
+            <Quiz 
+                question={currentQuestion} 
+                idx={quizIdx} 
+                score={score}
+                streak={streak}
+                onAnswer={handleAnswer} 
+                onNext={nextQuestion} 
+                onSkip={nextQuestion}
+                showExplain={showExplain}
+                onBookmark={toggleBookmark}
+                isBookmarked={currentQuestion && (progress.bookmarks || []).includes(currentQuestion.id)}
+                reviewLeft={currentQuestion ? Math.max(0, 2 - (progress.reviewStreak?.[currentQuestion.id] || 0)) : undefined}
+            />
+        </Layout>
+      );
   }
 
   // Chat View
