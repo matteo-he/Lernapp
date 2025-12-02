@@ -55,15 +55,13 @@ export const Chat: React.FC = () => {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       
       // Construct history for context
-      // Note: We only send the last few messages to save context window/tokens if needed, 
-      // but for gemini-3-pro-preview larger context is fine.
       const history = messages.map(m => ({
           role: m.role,
           parts: [{ text: m.text }]
       }));
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-pro-preview',
+        model: 'gemini-2.5-flash',
         contents: [...history, { role: 'user', parts: [{ text: userText }] }],
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
@@ -161,7 +159,7 @@ export const Chat: React.FC = () => {
             </button>
           </form>
           <div className="text-center mt-2">
-             <span className="text-[10px] text-slate-400">Powered by Gemini 3 Pro. Antworten können Fehler enthalten. Überprüfe wichtige Fakten im Gesetz.</span>
+             <span className="text-[10px] text-slate-400">Powered by Gemini 2.5 Flash. Antworten können Fehler enthalten. Überprüfe wichtige Fakten im Gesetz.</span>
           </div>
         </div>
       </Card>
