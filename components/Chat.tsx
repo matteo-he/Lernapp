@@ -52,7 +52,11 @@ export const Chat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Use explicit casting or fallback to ensure process.env access
+      const apiKey = process.env.API_KEY || (window as any).process?.env?.API_KEY;
+      if (!apiKey) throw new Error("API Key missing");
+
+      const ai = new GoogleGenAI({ apiKey });
       
       // Construct history for context
       const history = messages.map(m => ({
@@ -65,7 +69,7 @@ export const Chat: React.FC = () => {
         contents: [...history, { role: 'user', parts: [{ text: userText }] }],
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
-          temperature: 0.4, // Lower temperature for more factual legal answers
+          temperature: 0.4, 
         }
       });
 
@@ -79,7 +83,7 @@ export const Chat: React.FC = () => {
       const errorMsg: ChatMessage = { 
         id: (Date.now() + 1).toString(), 
         role: 'model', 
-        text: 'Es gab ein Problem bei der Verbindung zum Tutor-System. Bitte versuche es später noch einmal.', 
+        text: '⚠️ Fehler bei der Verbindung. Bitte prüfe deinen API Schlüssel oder die Internetverbindung.', 
         timestamp: Date.now() 
       };
       setMessages(prev => [...prev, errorMsg]);

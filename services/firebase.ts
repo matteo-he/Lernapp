@@ -1,6 +1,6 @@
-import { initializeApp, getApp, getApps, FirebaseApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-import { getFirestore, collection, doc, writeBatch, onSnapshot, setDoc, Firestore } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
-import { getAuth, onAuthStateChanged, signInAnonymously, Auth, User as FirebaseUser } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+import { initializeApp, getApp, getApps, FirebaseApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getFirestore, collection, doc, writeBatch, onSnapshot, setDoc, Firestore } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signInAnonymously, Auth, User as FirebaseUser } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDLH5c69JKeFWcJyBpzRUfv720KjnnRIU8",
