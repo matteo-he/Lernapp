@@ -65,6 +65,9 @@ export default function App() {
   const [adminSearch, setAdminSearch] = useState("");
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
 
+  // Stats Detail Modal State
+  const [detailedStatsGroup, setDetailedStatsGroup] = useState<any | null>(null);
+
   // Exam Results
   const [examResults, setExamResults] = useState({ correct: 0, total: 0, done: false });
 
@@ -315,13 +318,20 @@ export default function App() {
              <StatCard label="Trefferquote" value={`${progress.totalAttempts ? Math.round((progress.totalCorrect/progress.totalAttempts)*100) : 0}%`} icon="🎯" color="emerald" />
          </div>
 
-         <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-white">Fachbereiche</h3>
+         <h3 className="text-xl font-bold mb-4 text-slate-800 dark:text-white">Fachbereiche (Details durch Klick)</h3>
          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {stats.map(s => {
                 const percentage = s.total ? Math.round((s.correct / Math.max(s.attempted, 1)) * 100) : 0;
                 const coverage = s.total ? Math.round((s.attempted / s.total) * 100) : 0;
                 return (
-                    <GlassCard key={s.key} className="p-6">
+                    <GlassCard 
+                        key={s.key} 
+                        className="p-6 cursor-pointer hover:shadow-xl hover:scale-[1.01] transition-all relative group"
+                        onClick={() => setDetailedStatsGroup(s)} // Trigger Modal
+                    >
+                         <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity text-slate-400">
+                             ↗
+                         </div>
                         <div className="flex justify-between items-start mb-4">
                             <div>
                                 <h4 className={`font-bold text-lg text-${s.color}-600 dark:text-${s.color}-400`}>{s.title}</h4>
@@ -349,6 +359,94 @@ export default function App() {
                 );
             })}
          </div>
+
+         {/* Detailed Stats Modal */}
+         {detailedStatsGroup && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={() => setDetailedStatsGroup(null)}>
+                <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl animate-slide-up overflow-hidden" onClick={e => e.stopPropagation()}>
+                    <div className={`p-6 border-b border-slate-100 dark:border-slate-700 bg-${detailedStatsGroup.color}-50 dark:bg-${detailedStatsGroup.color}-900/20 flex justify-between items-center`}>
+                        <h3 className={`text-xl font-bold text-${detailedStatsGroup.color}-700 dark:text-${detailedStatsGroup.color}-400`}>{detailedStatsGroup.title} - Details</h3>
+                        <button onClick={() => setDetailedStatsGroup(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white dark:bg-slate-900 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">✕</button>
+                    </div>
+                    
+                    <div className="overflow-y-auto p-6 space-y-8">
+                        {(() => {
+                            // Filter questions for this group
+                            const groupQuestions = questions.filter(q => q.tags.some(t => detailedStatsGroup.tags.includes(t)));
+                            
+                            // Categorize
+                            const perfect = groupQuestions.filter(q => {
+                                const att = progress.attemptedIds[q.id] || 0;
+                                const corr = progress.correctIds[q.id] || 0;
+                                return att > 0 && att === corr;
+                            });
+
+                            const needsPractice = groupQuestions.filter(q => {
+                                const att = progress.attemptedIds[q.id] || 0;
+                                const corr = progress.correctIds[q.id] || 0;
+                                return att > 0 && att > corr;
+                            });
+
+                            const untouched = groupQuestions.filter(q => !progress.attemptedIds[q.id]);
+
+                            const ListSection = ({ title, items, icon, colorClass, emptyText }: any) => (
+                                <div>
+                                    <h4 className={`text-sm font-bold uppercase tracking-wider mb-3 flex items-center gap-2 ${colorClass}`}>
+                                        {icon} {title} ({items.length})
+                                    </h4>
+                                    {items.length === 0 ? (
+                                        <p className="text-sm text-slate-400 italic">{emptyText}</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {items.map((q: Question) => {
+                                                 const att = progress.attemptedIds[q.id] || 0;
+                                                 const corr = progress.correctIds[q.id] || 0;
+                                                 return (
+                                                    <div key={q.id} className="p-3 rounded-lg border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center gap-4">
+                                                        <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{q.question}</div>
+                                                        {att > 0 && (
+                                                            <div className="text-xs font-mono shrink-0 text-slate-500">
+                                                                {corr}/{att} ✓
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                 )
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+
+                            return (
+                                <>
+                                    <ListSection 
+                                        title="Sicher beherrscht" 
+                                        items={perfect} 
+                                        icon="✅" 
+                                        colorClass="text-emerald-600 dark:text-emerald-400" 
+                                        emptyText="Noch keine Fragen fehlerfrei beantwortet." 
+                                    />
+                                    <ListSection 
+                                        title="Wiederholungsbedarf" 
+                                        items={needsPractice} 
+                                        icon="⚠️" 
+                                        colorClass="text-rose-600 dark:text-rose-400" 
+                                        emptyText="Super! Keine offenen Fehler in diesem Bereich." 
+                                    />
+                                    <ListSection 
+                                        title="Noch offen" 
+                                        items={untouched} 
+                                        icon="⚪" 
+                                        colorClass="text-slate-500 dark:text-slate-400" 
+                                        emptyText="Alle Fragen dieses Bereichs wurden mindestens einmal bearbeitet." 
+                                    />
+                                </>
+                            );
+                        })()}
+                    </div>
+                </div>
+            </div>
+         )}
       </Layout>
     );
   }

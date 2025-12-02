@@ -4,11 +4,14 @@ interface CardProps {
   children: React.ReactNode;
   className?: string;
   gradient?: boolean;
+  onClick?: () => void;
 }
 
-export const Card: React.FC<CardProps> = ({ children, className = "", gradient = false }) => {
+export const Card: React.FC<CardProps> = ({ children, className = "", gradient = false, onClick }) => {
   return (
-    <div className={`
+    <div 
+      onClick={onClick}
+      className={`
       relative overflow-hidden rounded-2xl 
       bg-white dark:bg-slate-800 
       border border-slate-200 dark:border-slate-700
@@ -25,9 +28,11 @@ export const Card: React.FC<CardProps> = ({ children, className = "", gradient =
   );
 };
 
-export const GlassCard: React.FC<CardProps> = ({ children, className = "" }) => {
+export const GlassCard: React.FC<CardProps> = ({ children, className = "", onClick }) => {
   return (
-    <div className={`
+    <div 
+      onClick={onClick}
+      className={`
       rounded-2xl border border-white/20 shadow-xl
       bg-white/80 dark:bg-slate-900/80 
       backdrop-blur-md
