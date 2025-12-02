@@ -17,6 +17,20 @@ const RANKS = [
   { title: "Chefinspektor:in", min: 2000 },
 ];
 
+// Tailwind needs full class names to scan them. Dynamic strings like `bg-${color}` don't work reliable.
+const COLOR_MAP: Record<string, { bg: string, text: string, badgeBg: string, badgeText: string, bar: string, border: string }> = {
+  yellow: { bg: 'bg-yellow-500', text: 'text-yellow-600', badgeBg: 'bg-yellow-100', badgeText: 'text-yellow-800', bar: 'bg-yellow-500', border: 'border-yellow-500' },
+  blue:   { bg: 'bg-blue-500',   text: 'text-blue-600',   badgeBg: 'bg-blue-100',   badgeText: 'text-blue-800',   bar: 'bg-blue-500',   border: 'border-blue-500' },
+  red:    { bg: 'bg-red-500',    text: 'text-red-600',    badgeBg: 'bg-red-100',    badgeText: 'text-red-800',    bar: 'bg-red-500',    border: 'border-red-500' },
+  rose:   { bg: 'bg-rose-500',   text: 'text-rose-600',   badgeBg: 'bg-rose-100',   badgeText: 'text-rose-800',   bar: 'bg-rose-500',   border: 'border-rose-500' },
+  green:  { bg: 'bg-emerald-500',text: 'text-emerald-600',badgeBg: 'bg-emerald-100',badgeText: 'text-emerald-800',bar: 'bg-emerald-500',border: 'border-emerald-500' },
+  emerald:{ bg: 'bg-emerald-500',text: 'text-emerald-600',badgeBg: 'bg-emerald-100',badgeText: 'text-emerald-800',bar: 'bg-emerald-500',border: 'border-emerald-500' },
+};
+
+function getGroupColor(colorKey: string) {
+  return COLOR_MAP[colorKey] || COLOR_MAP.blue;
+}
+
 function rankFor(score: number){
   const r = [...RANKS].reverse().find(r=>score>=r.min);
   return r? r.title : RANKS[0].title;
@@ -54,7 +68,6 @@ export default function App() {
   const [streak, setStreak] = useState(0);
   const [showExplain, setShowExplain] = useState(false);
   const [score, setScore] = useState(() => {
-     // Calculate simplistic score from progress for display
      return progress.totalCorrect * 10;
   });
 
@@ -171,8 +184,6 @@ export default function App() {
   };
 
   // --- Derived State ---
-
-  // Simple sequential logic for now, can be replaced by smart shuffle if needed
   const currentQuestion = getCandidateQuestions.length > 0 ? getCandidateQuestions[quizIdx % getCandidateQuestions.length] : null;
 
   const stats = useMemo(() => {
@@ -346,11 +357,12 @@ export default function App() {
             {stats.map(s => {
                 const percentage = s.total ? Math.round((s.correct / Math.max(s.attempted, 1)) * 100) : 0;
                 const coverage = s.total ? Math.round((s.attempted / s.total) * 100) : 0;
+                const colors = getGroupColor(s.color);
+
                 return (
                     <GlassCard 
                         key={s.key} 
-                        className="p-6 cursor-pointer hover:shadow-xl hover:translate-y-[-4px] transition-all relative group border-l-4"
-                        style={{ borderLeftColor: `var(--color-${s.color}-500)` }}
+                        className={`p-6 cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all relative group border-l-4 ${colors.border}`}
                         onClick={() => setDetailedStatsGroup(s)} // Trigger Modal
                     >
                          <div className="absolute top-4 right-4 text-slate-300 group-hover:text-police-500 transition-colors bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
@@ -360,7 +372,7 @@ export default function App() {
                          </div>
                         <div className="flex justify-between items-start mb-4">
                             <div>
-                                <h4 className={`font-bold text-lg text-slate-800 dark:text-white group-hover:text-police-600 transition-colors`}>{s.title}</h4>
+                                <h4 className={`font-bold text-lg text-slate-800 dark:text-white group-hover:${colors.text} transition-colors`}>{s.title}</h4>
                                 <div className="flex items-center gap-2 mt-1">
                                     <span className="text-xs font-bold bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-slate-500">{s.key}</span>
                                     <span className="text-xs text-slate-400">{s.attempted} / {s.total} Fragen</span>
@@ -371,7 +383,7 @@ export default function App() {
                             <div>
                                 <div className="flex justify-between text-xs mb-1.5 font-semibold text-slate-500"><span>Wissensstand</span> <span>{percentage}%</span></div>
                                 <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5 overflow-hidden">
-                                    <div className={`bg-${s.color}-500 h-full rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(0,0,0,0.1)]`} style={{width: `${percentage}%`}}></div>
+                                    <div className={`${colors.bar} h-full rounded-full transition-all duration-1000 shadow-sm`} style={{width: `${percentage}%`}}></div>
                                 </div>
                             </div>
                             <div>
@@ -388,29 +400,34 @@ export default function App() {
 
          {/* Detailed Analysis Modal */}
          {detailedStatsGroup && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm animate-fade-in" onClick={() => setDetailedStatsGroup(null)}>
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in" onClick={() => setDetailedStatsGroup(null)}>
                 <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-5xl h-[85vh] flex flex-col shadow-2xl border border-slate-200 dark:border-slate-700 animate-slide-up overflow-hidden" onClick={e => e.stopPropagation()}>
                     
                     {/* Modal Header */}
-                    <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-slate-50 dark:bg-slate-950">
-                        <div className="flex items-center gap-6">
-                            <div className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl bg-${detailedStatsGroup.color}-100 dark:bg-${detailedStatsGroup.color}-900/20 flex items-center justify-center text-3xl md:text-4xl shadow-inner`}>
-                                {detailedStatsGroup.attempted > 0 && detailedStatsGroup.correct / Math.max(detailedStatsGroup.attempted, 1) > 0.8 ? '🌟' : '📊'}
-                            </div>
-                            <div>
-                                <div className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Analyse</div>
-                                <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-white mb-2">{detailedStatsGroup.title}</h2>
-                                <div className="flex gap-4 text-sm font-medium text-slate-500">
-                                    <span>{detailedStatsGroup.total} Fragen Gesamt</span>
-                                    <span className="w-px h-4 bg-slate-300 dark:bg-slate-700"></span>
-                                    <span>{detailedStatsGroup.attempted} Bearbeitet</span>
+                    {(() => {
+                        const colors = getGroupColor(detailedStatsGroup.color);
+                        return (
+                          <div className="p-6 md:p-8 border-b border-slate-100 dark:border-slate-800 flex justify-between items-start bg-slate-50 dark:bg-slate-950">
+                            <div className="flex items-center gap-6">
+                                <div className={`w-16 h-16 md:w-20 md:h-20 rounded-2xl ${colors.badgeBg} ${colors.badgeText} flex items-center justify-center text-3xl md:text-4xl shadow-inner`}>
+                                    {detailedStatsGroup.attempted > 0 && detailedStatsGroup.correct / Math.max(detailedStatsGroup.attempted, 1) > 0.8 ? '🌟' : '📊'}
+                                </div>
+                                <div>
+                                    <div className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-1">Analyse</div>
+                                    <h2 className="text-2xl md:text-3xl font-extrabold text-slate-800 dark:text-white mb-2">{detailedStatsGroup.title}</h2>
+                                    <div className="flex gap-4 text-sm font-medium text-slate-500">
+                                        <span>{detailedStatsGroup.total} Fragen Gesamt</span>
+                                        <span className="w-px h-4 bg-slate-300 dark:bg-slate-700"></span>
+                                        <span>{detailedStatsGroup.attempted} Bearbeitet</span>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <button onClick={() => setDetailedStatsGroup(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:text-rose-500 transition-all shadow-sm">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                        </button>
-                    </div>
+                            <button onClick={() => setDetailedStatsGroup(null)} className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-rose-50 hover:text-rose-500 transition-all shadow-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </div>
+                        );
+                    })()}
                     
                     <div className="flex-1 overflow-hidden flex flex-col md:flex-row">
                         {/* Sidebar / KPIs */}
@@ -420,7 +437,7 @@ export default function App() {
                             <div className="space-y-4 mb-6">
                                 <div className="p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                                     <div className="text-xs text-slate-500 uppercase font-bold mb-1">Erfolgsquote</div>
-                                    <div className={`text-3xl font-black text-${detailedStatsGroup.color}-600`}>
+                                    <div className={`text-3xl font-black ${getGroupColor(detailedStatsGroup.color).text}`}>
                                         {detailedStatsGroup.attempted ? Math.round((detailedStatsGroup.correct / detailedStatsGroup.attempted) * 100) : 0}%
                                     </div>
                                     <div className="text-xs text-slate-400 mt-1">Basierend auf allen Versuchen</div>
@@ -711,17 +728,26 @@ export default function App() {
 
 // Subcomponents
 
-const StatCard = ({ label, value, icon, color }: any) => (
-    <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4 hover:scale-[1.02] transition-transform">
-        <div className={`w-12 h-12 rounded-xl bg-${color}-100 dark:bg-${color}-900/30 flex items-center justify-center text-2xl`}>
-            {icon}
+const StatCard = ({ label, value, icon, color }: any) => {
+    // Basic mapping for stat cards
+    const colors: any = {
+        yellow: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600',
+        blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600',
+        indigo: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600',
+        emerald: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
+    };
+    return (
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4 hover:scale-[1.02] transition-transform">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${colors[color] || colors.blue}`}>
+                {icon}
+            </div>
+            <div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">{label}</div>
+                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{value}</div>
+            </div>
         </div>
-        <div>
-            <div className="text-sm text-slate-500 dark:text-slate-400">{label}</div>
-            <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{value}</div>
-        </div>
-    </div>
-);
+    );
+};
 
 const AuthForm = ({ onLogin, onRegister, users, hashPassword }: any) => {
     const [isLogin, setIsLogin] = useState(true);

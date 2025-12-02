@@ -50,6 +50,16 @@ function seededShuffle(array: number[], seedStr: string) {
   return a;
 }
 
+// Explicit color mapping for badges to ensure Tailwind does not purge them
+const BADGE_COLORS: Record<string, string> = {
+  yellow: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
+  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
+  red: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+  rose: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300',
+  green: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+  emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
+};
+
 export const Quiz: React.FC<QuizProps> = ({ 
     question, idx, score, streak, onAnswer, onNext, onSkip, showExplain, 
     mode = 'training', onBookmark, isBookmarked 
@@ -90,6 +100,7 @@ export const Quiz: React.FC<QuizProps> = ({
 
   const group = GROUPS.find(g => question.tags.some(t => g.tags.includes(t))) || GROUPS[GROUPS.length - 1];
   const correctSet = new Set(question.correct);
+  const badgeClass = BADGE_COLORS[group.color] || BADGE_COLORS.blue;
 
   const handleSelect = (displayIdx: number) => {
     if (showExplain) return;
@@ -107,7 +118,7 @@ export const Quiz: React.FC<QuizProps> = ({
       {/* Header Stats */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-${group.color}-100 text-${group.color}-700 dark:bg-${group.color}-900/50 dark:text-${group.color}-300`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${badgeClass}`}>
                 {group.title}
             </span>
             <span className="px-3 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-xs text-slate-500 font-medium border border-slate-200 dark:border-slate-700">
