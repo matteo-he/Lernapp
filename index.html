@@ -1,0 +1,1168 @@
+
+<!DOCTYPE html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Polizei Lerntool Pro</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              police: {
+                50: '#f0f9ff',
+                100: '#e0f2fe',
+                200: '#bae6fd',
+                300: '#7dd3fc',
+                400: '#38bdf8',
+                500: '#0ea5e9',
+                600: '#0284c7', // Primary Brand Color
+                700: '#0369a1',
+                800: '#075985',
+                900: '#0c4a6e',
+                950: '#082f49',
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            },
+            animation: {
+              'fade-in': 'fadeIn 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+              'slide-up': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
+              'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+              'float': 'float 6s ease-in-out infinite',
+              'bounce-sm': 'bounceSm 2s infinite',
+            },
+            keyframes: {
+              fadeIn: {
+                '0%': { opacity: '0' },
+                '100%': { opacity: '1' },
+              },
+              slideUp: {
+                '0%': { opacity: '0', transform: 'translateY(20px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
+              },
+              float: {
+                '0%, 100%': { transform: 'translateY(0)' },
+                '50%': { transform: 'translateY(-10px)' },
+              },
+              bounceSm: {
+                '0%, 100%': { transform: 'translateY(-5%)', animationTimingFunction: 'cubic-bezier(0.8, 0, 1, 1)' },
+                '50%': { transform: 'translateY(0)', animationTimingFunction: 'cubic-bezier(0, 0, 0.2, 1)' },
+              }
+            },
+            boxShadow: {
+              'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+              'glass-hover': '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
+              'glow': '0 0 20px rgba(14, 165, 233, 0.3)',
+            }
+          }
+        }
+      }
+    </script>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Confetti Lib -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Import Map for Gemini SDK -->
+    <script type="importmap">
+    {
+      "imports": {
+        "@google/genai": "https://esm.run/@google/genai",
+        "react": "https://aistudiocdn.com/react@^19.2.0",
+        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+        "react/": "https://aistudiocdn.com/react@^19.2.0/"
+      }
+    }
+    </script>
+
+    <!-- Process Env Shim for API Key -->
+    <script>
+      window.process = window.process || { env: {} };
+      // HINWEIS: Hier könnte der API Key für lokale Tests eingefügt werden, wenn sicher.
+      // window.process.env.API_KEY = "DEIN_KEY_HIER";
+    </script>
+
+    <!-- Styles -->
+    <style>
+      body { 
+        font-family: 'Inter', sans-serif; 
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+      
+      /* Custom Scrollbar */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+      .dark ::-webkit-scrollbar-thumb { background: #334155; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+      /* Glassmorphism Classes */
+      .glass {
+        background: rgba(255, 255, 255, 0.65);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+      .dark .glass {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      
+      .glass-card {
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        box-shadow: 0 10px 40px -10px rgba(0,0,0,0.05);
+      }
+      .dark .glass-card {
+        background: rgba(30, 41, 59, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        box-shadow: 0 10px 40px -10px rgba(0,0,0,0.2);
+      }
+
+      /* Animated Background */
+      .bg-animated {
+        background: linear-gradient(-45deg, #f0f9ff, #e0e7ff, #f3e8ff, #ecfeff);
+        background-size: 400% 400%;
+        animation: gradient 15s ease infinite;
+      }
+      .dark .bg-animated {
+        background: linear-gradient(-45deg, #0f172a, #1e1b4b, #172554, #020617);
+      }
+      @keyframes gradient {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+      }
+
+      .scrollbar-hide::-webkit-scrollbar { display: none; }
+      .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+      
+      input:-webkit-autofill,
+      input:-webkit-autofill:hover, 
+      input:-webkit-autofill:focus, 
+      input:-webkit-autofill:active{
+          -webkit-box-shadow: 0 0 0 30px white inset !important;
+          transition: background-color 5000s ease-in-out 0s;
+      }
+      .dark input:-webkit-autofill {
+          -webkit-box-shadow: 0 0 0 30px #1e293b inset !important;
+          -webkit-text-fill-color: white !important;
+      }
+    </style>
+
+    <!-- Firebase SDK Setup -->
+    <script type="module">
+      import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
+      import { getFirestore, collection, doc, writeBatch, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
+      import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+
+      const firebaseConfig = {
+        apiKey: "AIzaSyDLH5c69JKeFWcJyBpzRUfv720KjnnRIU8",
+        authDomain: "e1-und-e2a-lerntool.firebaseapp.com",
+        projectId: "e1-und-e2a-lerntool",
+        storageBucket: "e1-und-e2a-lerntool.firebasestorage.app",
+        messagingSenderId: "28649721297",
+        appId: "1:28649721297:web:432abbe98e34dd50fc24f0"
+      };
+
+      let app, db, auth;
+      try {
+        app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        onAuthStateChanged(auth, (user) => {
+          if (!user) signInAnonymously(auth).catch(console.error);
+        });
+      } catch(e) { console.error("Firebase init error", e); }
+
+      window.fb = {
+        db, auth, collection, doc, writeBatch, onSnapshot, setDoc,
+        ensureAuth: () => new Promise((resolve) => {
+          if(!auth) return resolve(null);
+          if(auth.currentUser) return resolve(auth.currentUser);
+          const unsub = onAuthStateChanged(auth, u => {
+            if(u) { unsub(); resolve(u); }
+          });
+        })
+      };
+      window.dispatchEvent(new Event('firebase-ready'));
+    </script>
+  </head>
+  <body class="bg-animated min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300 selection:bg-police-200 dark:selection:bg-police-900">
+    <div id="root"></div>
+
+    <script type="module">
+      import { GoogleGenAI } from "@google/genai";
+      window.GoogleGenAI = GoogleGenAI;
+    </script>
+
+    <script type="text/babel">
+      const { useState, useEffect, useMemo, useCallback, useRef } = React;
+
+      // --- Constants ---
+      const GROUPS = [
+        { key:"BDG",   title:"Dienstrecht (BDG)",           tags:["BDG"], color: "yellow" },
+        { key:"SPG",   title:"Sicherheitspolizei (SPG)",     tags:["SPG"], color: "blue" },
+        { key:"STPO",  title:"Strafprozess/StGB",            tags:["StPO","StGB"], color: "rose" }, 
+        { key:"ADMIN", title:"Verwaltung & Verkehr",          tags:["AVG","VStG","WaffG","StVO","KFG","FSG"], color: "emerald" },
+      ];
+
+      const RANKS = [
+        { title: "Anwärter:in", min: 0 },
+        { title: "Inspektor:in", min: 150 },
+        { title: "Gruppeninspektor:in", min: 400 },
+        { title: "Revierinspektor:in", min: 800 },
+        { title: "Abteilungsinspektor:in", min: 1300 },
+        { title: "Chefinspektor:in", min: 2000 },
+      ];
+      
+      const DEFAULT_QUESTIONS = [
+        { id: "bdg-1", question: "Was gehört zu den allgemeinen Dienstpflichten eines Beamten gemäß § 43 BDG?", choices: ["Treu, gewissenhaft und unparteiisch handeln", "Nur Weisungen befolgen, keine Eigeninitiative", "Politische Betätigung im Dienst", "Private Geschäfte im Dienst fördern", "Ausschließlich den Vorgesetzten melden"], correct: [0], explain: "§ 43 BDG: Der Beamte ist verpflichtet, seine dienstlichen Aufgaben unter Beachtung der geltenden Rechtsordnung treu, gewissenhaft, engagiert und unparteiisch mit den ihm zur Verfügung stehenden Mitteln zu besorgen.", law_ref: "BDG § 43", tags: ["BDG"], difficulty: 1 },
+        { id: "bdg-2", question: "Wann darf ein Beamter eine Weisung ablehnen (§ 44 BDG)?", choices: ["Wenn sie ihm unzweckmäßig erscheint", "Wenn sie von einem unzuständigen Organ erteilt wurde", "Wenn sie gegen Strafgesetzvorschriften verstößt", "Wenn sie mündlich erteilt wurde", "Wenn er gerade Pause hat"], correct: [1, 2], explain: "§ 44 BDG: Eine Weisung ist zu befolgen, außer sie wurde von einem unzuständigen Organ erteilt oder die Befolgung würde gegen strafgesetzliche Vorschriften verstoßen.", law_ref: "BDG § 44", tags: ["BDG"], difficulty: 2 },
+        { id: "spg-1", question: "Was ist Aufgabe der Sicherheitspolizei gemäß SPG?", choices: ["Aufrechterhaltung der öffentlichen Ruhe, Ordnung und Sicherheit", "Erste Hilfe Leistung bei Unfällen", "Verkehrsregelung", "Eintreiben von Steuern", "Ausstellung von Reisepässen"], correct: [0, 1], explain: "Die Sicherheitspolizei umfasst die Aufrechterhaltung der öffentlichen Ruhe, Ordnung und Sicherheit sowie die erste allgemeine Hilfeleistungspflicht.", law_ref: "SPG § 3", tags: ["SPG"], difficulty: 1 },
+        { id: "spg-2", question: "Wer sind Organe des öffentlichen Sicherheitsdienstes?", choices: ["Angehörige der Bundespolizei", "Private Sicherheitsdienste", "Feuerwehrleute", "Gemeindewachkörper", "Angehörige des Bundesheeres im Assistenzeinsatz"], correct: [0, 4], explain: "Organe des öffentlichen Sicherheitsdienstes sind Angehörige der Bundespolizei, aber auch Angehörige der Gemeindewachkörper und z.B. das Bundesheer im Assistenzeinsatz.", law_ref: "SPG § 5", tags: ["SPG"], difficulty: 2 },
+        { id: "stgb-1", question: "Was versteht man unter Notwehr (§ 3 StGB)?", choices: ["Verteidigung, die notwendig ist, um einen gegenwärtigen oder unmittelbar drohenden rechtswidrigen Angriff abzuwehren", "Vergeltung für eine vergangene Tat", "Präventiver Angriff bei Verdacht", "Racheakt", "Bestrafung des Täters"], correct: [0], explain: "§ 3 StGB: Nicht rechtswidrig handelt, wer sich nur der Verteidigung bedient, die notwendig ist, um einen gegenwärtigen oder unmittelbar drohenden rechtswidrigen Angriff auf Leben, Gesundheit, körperliche Unversehrtheit, Freiheit oder Vermögen von sich oder einem anderen abzuwehren.", law_ref: "StGB § 3", tags: ["StGB"], difficulty: 2 },
+        { id: "stvo-1", question: "Wer gilt als 'bevorzugter Straßenbenützer'?", choices: ["Einsatzfahrzeuge mit Blaulicht und Folgetonhorn", "Fahrzeuge im Linienverkehr", "Taxis", "LKW über 7,5t", "Radfahrer"], correct: [0], explain: "Einsatzfahrzeuge (Blaulicht + Folgetonhorn) gelten als bevorzugte Straßenbenützer.", law_ref: "StVO § 26", tags: ["StVO"], difficulty: 1 },
+        { id: "stvo-2", question: "Ab welchem Alkoholgehalt im Blut darf ein KFZ nicht mehr gelenkt werden (Grundregel)?", choices: ["0.1 Promille", "0.5 Promille", "0.8 Promille", "1.0 Promille", "0.0 Promille"], correct: [1], explain: "Gemäß § 14 FSG bzw. § 5 StVO gilt grundsätzlich die 0,5-Promille-Grenze (bzw. 0,25 mg/l Atemluft). Für Probeführerscheinbesitzer gilt 0,1 Promille.", law_ref: "StVO § 5", tags: ["StVO"], difficulty: 1 },
+        { id: "kfg-1", question: "Was muss man bei einer Verkehrskontrolle auf Verlangen aushändigen?", choices: ["Führerschein", "Zulassungsschein", "Reisepass", "Kaufvertrag des Autos", "Versicherungspolizze"], correct: [0, 1], explain: "Führerschein und Zulassungsschein sind den Organen der Straßenaufsicht auf Verlangen zur Überprüfung auszuhändigen.", law_ref: "KFG § 102", tags: ["KFG"], difficulty: 1 },
+        { id: "fsg-1", question: "Für welche Fahrzeuge gilt die Führerscheinklasse B?", choices: ["Kraftwagen bis 3.500 kg höchstzulässige Gesamtmasse", "Motorräder über 125ccm", "LKW über 7.5t", "Omnibusse", "Kraftwagen bis 8 Sitzplätze außer Lenker"], correct: [0, 4], explain: "Klasse B: Kraftwagen mit nicht mehr als 3.500 kg höchster zulässiger Gesamtmasse und nicht mehr als 8 Sitzplätzen außer dem Lenkerplatz.", law_ref: "FSG § 2", tags: ["FSG"], difficulty: 1 },
+        { id: "stgb-2", question: "Wann handelt man vorsätzlich?", choices: ["Wenn man einen Sachverhalt verwirklichen will", "Wenn man es ernstlich für möglich hält und sich damit abfindet", "Wenn man aus Unachtsamkeit handelt", "Wenn man die Sorgfalt außer Acht lässt", "Wenn man reflexartig handelt"], correct: [0, 1], explain: "Vorsatz umfasst Absichtlichkeit, Wissentlichkeit und bedingten Vorsatz (ernstlich für möglich halten und sich abfinden).", law_ref: "StGB § 5", tags: ["StGB"], difficulty: 3 }
+      ];
+
+      const FIRESTORE_QUESTIONS = "questions";
+      const FIRESTORE_USERS = "users";
+      const FIRESTORE_PROGRESS = "userProgress";
+
+      const SYSTEM_INSTRUCTION = `
+        Du bist ein erfahrener Ausbildner und KI-Tutor für die österreichische Polizei (E1/E2a Auswahlprüfung und Grundausbildung).
+        Dein Ziel ist es, Anwärter bei der Vorbereitung auf die Prüfung zu unterstützen.
+
+        Deine Spezialgebiete basieren auf folgendem Lehrplan:
+        1. DIENSTRECHT (BDG, Gehaltsgesetz, RGV): Fokus auf Pflichten (§ 43, 44 BDG), Rechte, Ernennung.
+        2. SICHERHEITSPOLIZEI (SPG): Befugnisse, Aufgaben der Sicherheitsbehörden, Organe des öffentlichen Sicherheitsdienstes.
+        3. STRAFRECHT (StGB): Allgemeiner Teil (Vorsatz, Notwehr) und Besonderer Teil (Leib & Leben, Vermögen, Amtspflicht).
+        4. VERKEHRSRECHT (StVO, KFG, FSG): Fahrregeln, Bevorzugte Straßenbenützer, Alkohol, Zulassung, Führerschein.
+        5. VERFASSUNGSRECHT: Grundrechte (EMRK), Staatsorganisation.
+        6. FREMDENRECHT & WAFFENGESETZ.
+
+        Verhaltensregeln:
+        - Antworte präzise, juristisch korrekt, aber verständlich.
+        - Zitiere, wenn möglich, den entsprechenden Paragraphen (§).
+        - Wenn eine Frage unklar ist, frage nach dem Kontext (z.B. "Meinst du im Sinne des SPG oder StPO?").
+        - Sei motivierend, aber streng in der Sache (Polizeiarbeit erfordert Genauigkeit).
+        - Halte die Antworten kompakt, außer der User bittet um eine ausführliche Erklärung.
+
+        Du bist kein Rechtsanwalt, sondern ein Tutor für die Ausbildung.
+      `;
+
+      // --- Utils ---
+      function hashPassword(str) {
+        let hash = 0;
+        str = str || "";
+        for (let i = 0; i < str.length; i++) {
+          hash = (hash << 5) - hash + str.charCodeAt(i);
+          hash |= 0;
+        }
+        return `h${Math.abs(hash)}`;
+      }
+
+      function rankFor(score) {
+        const r = [...RANKS].reverse().find(r => score >= r.min);
+        return r ? r.title : RANKS[0].title;
+      }
+
+      function fireConfetti() {
+        if(window.confetti) {
+          window.confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#0284c7', '#fbbf24', '#ffffff']
+          });
+        }
+      }
+
+      // --- Hooks ---
+      function useQuestions() {
+        const [questions, setQuestionsState] = useState(() => {
+          try { return JSON.parse(localStorage.getItem('questions') || '[]'); } catch { return []; }
+        });
+        
+        useEffect(() => {
+          try { localStorage.setItem('questions', JSON.stringify(questions)); } catch {}
+        }, [questions]);
+
+        useEffect(() => {
+          const handler = async () => {
+            if (!window.fb || !window.fb.db) return;
+            const { db, collection, onSnapshot, ensureAuth } = window.fb;
+            await ensureAuth();
+            return onSnapshot(collection(db, FIRESTORE_QUESTIONS), (snapshot) => {
+              const remote = [];
+              snapshot.forEach(doc => {
+                const d = doc.data();
+                if (!d.__deleted) remote.push({ ...d, id: doc.id });
+              });
+              setQuestionsState(prev => {
+                const map = new Map(prev.map(q => [q.id, q]));
+                remote.forEach(q => map.set(q.id, q));
+                return Array.from(map.values());
+              });
+            });
+          };
+          let unsub;
+          if (window.fb) handler().then(u => unsub = u);
+          else window.addEventListener('firebase-ready', () => handler().then(u => unsub = u));
+          return () => unsub && unsub();
+        }, []);
+        return { questions, setQuestions: setQuestionsState };
+      }
+
+      function useUsers() {
+        const [users, setUsersState] = useState(() => {
+          try { return JSON.parse(localStorage.getItem('users') || '[]'); } catch { return []; }
+        });
+
+        useEffect(() => { try { localStorage.setItem('users', JSON.stringify(users)); } catch {} }, [users]);
+
+        useEffect(() => {
+            const handler = async () => {
+                if(!window.fb || !window.fb.db) return;
+                const { db, collection, onSnapshot, ensureAuth } = window.fb;
+                await ensureAuth();
+                return onSnapshot(collection(db, FIRESTORE_USERS), snap => {
+                    const remote = [];
+                    snap.forEach(d => remote.push(d.data()));
+                    setUsersState(remote);
+                });
+            };
+            let unsub;
+            if(window.fb) handler().then(u => unsub = u);
+            else window.addEventListener('firebase-ready', () => handler().then(u => unsub = u));
+            return () => unsub && unsub();
+        }, []);
+
+        const upsertUser = async (user) => {
+            if(window.fb && window.fb.db) {
+                const { db, doc, setDoc, ensureAuth } = window.fb;
+                await ensureAuth();
+                await setDoc(doc(db, FIRESTORE_USERS, user.id), user, { merge: true });
+            }
+            setUsersState(prev => {
+                const idx = prev.findIndex(u => u.id === user.id);
+                if(idx >= 0) { const next = [...prev]; next[idx] = user; return next; }
+                return [...prev, user];
+            });
+        };
+        return { users, upsertUser, hashPassword };
+      }
+
+      function useProgress(userId) {
+        const key = userId ? `progress:${userId}` : null;
+        const [progress, setProgress] = useState(() => {
+            if(!key) return { totalAttempts: 0, totalCorrect: 0, attemptedIds: {}, correctIds: {}, bookmarks: [] };
+            try { return JSON.parse(localStorage.getItem(key) || 'null') || { totalAttempts: 0, totalCorrect: 0, attemptedIds: {}, correctIds: {}, bookmarks: [] }; }
+            catch { return { totalAttempts: 0, totalCorrect: 0, attemptedIds: {}, correctIds: {}, bookmarks: [] }; }
+        });
+        const applyingRemote = useRef(false);
+
+        useEffect(() => { if(key) localStorage.setItem(key, JSON.stringify(progress)); }, [key, progress]);
+
+        useEffect(() => {
+            if(!userId || !window.fb || !window.fb.db) return;
+            const { db, doc, onSnapshot, ensureAuth } = window.fb;
+            let unsub;
+            (async () => {
+                await ensureAuth();
+                unsub = onSnapshot(doc(db, FIRESTORE_PROGRESS, userId), snap => {
+                    if(snap.exists()) {
+                        const data = snap.data();
+                        const remoteProg = data[`${userId}:metrics`] || data;
+                        if(remoteProg && remoteProg.totalAttempts !== undefined) {
+                            applyingRemote.current = true;
+                            setProgress(p => ({ ...p, ...remoteProg }));
+                            applyingRemote.current = false;
+                        }
+                    }
+                });
+            })();
+            return () => unsub && unsub();
+        }, [userId]);
+
+        const updateProgress = useCallback((updater) => {
+            setProgress(prev => {
+                const next = typeof updater === 'function' ? updater(prev) : updater;
+                if(userId && window.fb && window.fb.db && !applyingRemote.current) {
+                    const { db, doc, setDoc } = window.fb;
+                    setDoc(doc(db, FIRESTORE_PROGRESS, userId), { [`${userId}:metrics`]: next }, { merge: true }).catch(console.error);
+                }
+                return next;
+            });
+        }, [userId]);
+        return [progress, updateProgress];
+      }
+
+      // --- Components ---
+
+      function GlassCard({ children, className = "" }) {
+        return (
+          <div className={`glass-card rounded-2xl p-6 transition-all duration-300 ${className}`}>
+            {children}
+          </div>
+        );
+      }
+
+      function Card({ children, className = "", gradient = false }) {
+        return (
+            <div className={`relative overflow-hidden rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg hover:shadow-xl transition-all duration-300 ${className}`}>
+                {gradient && <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-police-500 to-indigo-500" />}
+                <div className="relative z-10">{children}</div>
+            </div>
+        );
+      }
+
+      function StatCard({ label, value, icon, color }) {
+        return (
+          <div className="glass-card p-5 rounded-2xl flex items-center gap-4 group hover:scale-[1.02] transition-transform duration-300 relative overflow-hidden">
+            <div className={`absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 text-${color}-500 text-6xl rotate-12 transition-opacity pointer-events-none`}>
+               {icon}
+            </div>
+            <div className={`relative z-10 w-12 h-12 rounded-xl bg-${color}-50 dark:bg-${color}-900/30 flex items-center justify-center text-2xl shadow-inner text-${color}-600 dark:text-${color}-400`}>
+              {icon}
+            </div>
+            <div className="relative z-10">
+              <div className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</div>
+              <div className="text-xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{value}</div>
+            </div>
+          </div>
+        );
+      }
+
+      function AuthForm({ users, onLogin, onRegister, upsertUser }) {
+        const [isLogin, setIsLogin] = useState(true);
+        const [name, setName] = useState("");
+        const [pass, setPass] = useState("");
+        const [confirmPass, setConfirmPass] = useState("");
+        const [error, setError] = useState("");
+
+        const handleRescue = () => {
+            const username = prompt("Benutzername für Wiederherstellung:");
+            if (!username) return;
+            if (username.toLowerCase() === "hehle") {
+                const secret = prompt("Master-Code eingeben:");
+                if (secret === "polizei") {
+                    const newHash = hashPassword("1234");
+                    const user = users.find(u => u.username.toLowerCase() === "hehle");
+                    if (user) {
+                        upsertUser({ ...user, passwordHash: newHash });
+                        alert("Passwort wurde auf '1234' zurückgesetzt.");
+                    } else {
+                        const newUser = { id: `admin-${Date.now()}`, username: "hehle", passwordHash: newHash, role: "admin" };
+                        upsertUser(newUser);
+                        alert("Admin 'hehle' erstellt. Passwort: '1234'.");
+                    }
+                } else alert("Falscher Code.");
+            } else alert("Keine Berechtigung.");
+        };
+
+        const submit = (e) => {
+          e.preventDefault();
+          setError("");
+          if (!name.trim()) return setError("Bitte Namen eingeben");
+          if (!pass) return setError("Bitte Passwort eingeben");
+
+          if (isLogin) {
+            const u = users.find(u => u.username.toLowerCase() === name.toLowerCase());
+            if (u && u.passwordHash === hashPassword(pass)) onLogin(u.id);
+            else setError("Benutzername oder Passwort falsch.");
+          } else {
+            if (users.find(u => u.username.toLowerCase() === name.toLowerCase())) return setError("Name bereits vergeben");
+            if (pass.length < 4) return setError("Passwort zu kurz (min. 4 Zeichen)");
+            if (pass !== confirmPass) return setError("Passwörter stimmen nicht überein");
+            
+            let role = 'user';
+            if (name.toLowerCase() === 'admin' && pass === 'polizei') role = 'admin';
+
+            const id = `user-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            const newUser = { id, username: name, passwordHash: hashPassword(pass), role };
+            onRegister(newUser);
+            onLogin(id);
+          }
+        };
+
+        return (
+          <div className="w-full max-w-sm mx-auto">
+            <form onSubmit={submit} className="space-y-4 animate-slide-up">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 ml-1">Benutzername</label>
+                <input value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 focus:ring-2 focus:ring-police-500 focus:border-police-500 outline-none transition-all shadow-sm" placeholder="Dein Name" />
+              </div>
+              
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 ml-1">Passwort</label>
+                <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50 focus:ring-2 focus:ring-police-500 focus:border-police-500 outline-none transition-all shadow-sm" placeholder="••••••••" />
+              </div>
+
+              {!isLogin && (
+                <div className="animate-fade-in">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 ml-1">Passwort bestätigen</label>
+                    <input type="password" value={confirmPass} onChange={e => setConfirmPass(e.target.value)} className={`w-full px-4 py-3 rounded-xl border ${pass && confirmPass && pass !== confirmPass ? 'border-rose-300 ring-1 ring-rose-300' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-800/50 focus:ring-2 focus:ring-police-500 focus:border-police-500 outline-none transition-all shadow-sm`} placeholder="••••••••" />
+                    {pass && confirmPass && pass !== confirmPass && <p className="text-xs text-rose-500 mt-1 ml-1">Stimmt nicht überein</p>}
+                </div>
+              )}
+              
+              {error && <div className="p-3 rounded-lg bg-rose-50/50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-300 text-sm font-medium border border-rose-100 dark:border-rose-900/30 flex items-center gap-2">⚠️ {error}</div>}
+              
+              <button type="submit" className="w-full bg-gradient-to-r from-police-600 to-indigo-600 hover:from-police-500 hover:to-indigo-500 text-white py-3.5 rounded-xl font-bold shadow-lg shadow-police-500/25 hover:shadow-police-500/40 hover:-translate-y-0.5 transition-all active:scale-[0.98]">
+                {isLogin ? 'Anmelden' : 'Registrieren'}
+              </button>
+            </form>
+            
+            <div className="mt-6 flex flex-col items-center gap-3">
+                <button onClick={() => { setIsLogin(!isLogin); setError(""); setPass(""); setConfirmPass(""); }} className="text-sm text-slate-500 hover:text-police-600 dark:hover:text-police-400 font-medium transition-colors">
+                    {isLogin ? 'Noch kein Konto? Jetzt registrieren' : 'Bereits registriert? Zum Login'}
+                </button>
+                
+                {isLogin && (
+                    <button onClick={handleRescue} className="text-xs text-rose-400 hover:text-rose-600 dark:hover:text-rose-300 underline opacity-60 hover:opacity-100 transition-opacity">
+                        Zugang wiederherstellen (Admin)
+                    </button>
+                )}
+            </div>
+          </div>
+        );
+      }
+
+      // --- Chat Component ---
+      function Chat() {
+        const [messages, setMessages] = useState([
+            { id: 'welcome', role: 'model', text: 'Servus! Ich bin dein KI-Tutor für die E1/E2a Ausbildung. Ich kenne mich bestens mit dem BDG, SPG, StGB und der StVO aus. Was möchtest du heute wiederholen?', timestamp: Date.now() }
+        ]);
+        const [input, setInput] = useState('');
+        const [isLoading, setIsLoading] = useState(false);
+        const scrollRef = useRef(null);
+
+        useEffect(() => {
+            if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: 'smooth' });
+        }, [messages, isLoading]);
+
+        const handleSend = async (e) => {
+            e?.preventDefault();
+            if (!input.trim() || isLoading) return;
+
+            const userText = input;
+            setInput('');
+            const userMsg = { id: Date.now().toString(), role: 'user', text: userText, timestamp: Date.now() };
+            
+            setMessages(prev => [...prev, userMsg]);
+            setIsLoading(true);
+
+            try {
+                if(!window.GoogleGenAI) throw new Error("Gemini SDK not loaded");
+                
+                // Use process.env.API_KEY as requested. Shim is provided in head for safety.
+                const apiKey = process.env.API_KEY;
+                
+                if (!apiKey) {
+                    throw new Error("API Key fehlt. Bitte konfiguriere process.env.API_KEY.");
+                }
+
+                const ai = new window.GoogleGenAI({ apiKey });
+                const history = messages.map(m => ({ role: m.role, parts: [{ text: m.text }] }));
+                
+                const response = await ai.models.generateContent({
+                    model: 'gemini-3-pro-preview',
+                    contents: [...history, { role: 'user', parts: [{ text: userText }] }],
+                    config: { systemInstruction: SYSTEM_INSTRUCTION }
+                });
+
+                const aiText = response.text || "Keine Antwort erhalten.";
+                const aiMsg = { id: (Date.now() + 1).toString(), role: 'model', text: aiText, timestamp: Date.now() };
+                setMessages(prev => [...prev, aiMsg]);
+
+            } catch (error) {
+                console.error("Chat Error", error);
+                const errorMsg = { id: (Date.now() + 1).toString(), role: 'model', text: 'Fehler: API Key fehlt oder Verbindungsproblem. (Prüfe die Konsole)', timestamp: Date.now() };
+                setMessages(prev => [...prev, errorMsg]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        return (
+            <div className="flex flex-col h-[calc(100vh-140px)] md:h-[calc(100vh-100px)]">
+                <div className="mb-4">
+                    <h2 className="text-3xl font-bold text-slate-800 dark:text-white">KI-Tutor</h2>
+                    <p className="text-slate-500 dark:text-slate-400">Stelle Fragen zu BDG, SPG, StVO und mehr.</p>
+                </div>
+                <Card className="flex-1 flex flex-col p-0 overflow-hidden border border-slate-200 dark:border-slate-700 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+                    <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50/50 dark:bg-slate-950/50">
+                        {messages.map((msg) => {
+                            const isUser = msg.role === 'user';
+                            return (
+                                <div key={msg.id} className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
+                                    <div className={`max-w-[85%] md:max-w-[75%] rounded-2xl p-4 shadow-sm relative ${isUser ? 'bg-gradient-to-br from-police-600 to-indigo-600 text-white rounded-tr-sm' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700 rounded-tl-sm'}`}>
+                                        <div className={`text-sm md:text-base leading-relaxed whitespace-pre-wrap ${!isUser ? 'ml-2' : ''}`}>{msg.text}</div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                        {isLoading && <div className="p-4 bg-white dark:bg-slate-800 rounded-2xl w-fit ml-2 border border-slate-200 dark:border-slate-700"><div className="flex gap-2"><div className="w-2 h-2 bg-police-400 rounded-full animate-bounce"></div><div className="w-2 h-2 bg-police-400 rounded-full animate-bounce delay-100"></div><div className="w-2 h-2 bg-police-400 rounded-full animate-bounce delay-200"></div></div></div>}
+                        <div ref={scrollRef} />
+                    </div>
+                    <div className="p-4 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800">
+                        <form onSubmit={handleSend} className="relative flex items-center gap-2">
+                            <input type="text" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Frage stellen..." className="w-full pl-4 pr-12 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-police-500 outline-none transition-all shadow-inner text-slate-800 dark:text-slate-100" disabled={isLoading} />
+                            <button type="submit" disabled={!input.trim() || isLoading} className="absolute right-2 p-2 bg-police-600 hover:bg-police-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-lg transition-colors shadow-md">➤</button>
+                        </form>
+                    </div>
+                </Card>
+            </div>
+        );
+      }
+
+      function Layout({ children, user, onLogout, currentView, setView, theme, toggleTheme }) {
+        if (!user) {
+          return (
+            <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                   <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-police-200/40 via-transparent to-transparent dark:from-police-900/20"></div>
+                   <div className="absolute -top-[20%] -right-[10%] w-[600px] h-[600px] bg-indigo-400/20 rounded-full blur-[120px] animate-float"></div>
+                   <div className="absolute top-[40%] -left-[10%] w-[500px] h-[500px] bg-police-400/20 rounded-full blur-[100px] animate-float" style={{animationDelay: '-3s'}}></div>
+                </div>
+                <div className="relative z-10 w-full max-w-md">
+                   <GlassCard className="border-t-4 border-t-police-500 shadow-2xl">
+                        <div className="text-center mb-8">
+                            <div className="w-20 h-20 bg-gradient-to-br from-police-500 to-indigo-600 rounded-2xl mx-auto flex items-center justify-center text-4xl mb-6 shadow-glow transform -rotate-6">👮</div>
+                            <h1 className="text-3xl font-extrabold text-slate-800 dark:text-white tracking-tight">Polizei Lerntool</h1>
+                            <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">E1 / E2a Prüfungsvorbereitung</p>
+                        </div>
+                        {children}
+                   </GlassCard>
+                </div>
+            </div>
+          );
+        }
+
+        const NavItem = ({ id, label, icon }) => (
+          <button 
+            onClick={() => setView(id)}
+            className={`
+              flex items-center gap-3 px-4 py-3.5 rounded-xl transition-all duration-200 w-full font-medium group
+              ${currentView === id 
+                ? 'bg-gradient-to-r from-police-600 to-indigo-600 text-white shadow-lg shadow-police-500/30' 
+                : 'text-slate-600 dark:text-slate-400 hover:bg-white/50 dark:hover:bg-slate-800/50 hover:scale-[1.02]'}
+            `}
+          >
+            <span className={`text-xl ${currentView === id ? 'animate-pulse-slow' : 'group-hover:scale-110 transition-transform'}`}>{icon}</span>
+            <span className="hidden md:inline">{label}</span>
+          </button>
+        );
+
+        return (
+          <div className="min-h-screen flex flex-col md:flex-row">
+            <aside className="hidden md:flex flex-col w-72 p-6 glass border-r-0 fixed h-full z-20">
+              <div className="flex items-center gap-3 px-2 mb-10 mt-2">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-police-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">P</div>
+                <div><h1 className="font-bold text-lg leading-none text-slate-800 dark:text-white">Polizei<br/><span className="text-police-600 dark:text-police-400">Lerntool</span></h1></div>
+              </div>
+              <nav className="space-y-3 flex-1">
+                <NavItem id="dashboard" label="Dashboard" icon="📊" />
+                <NavItem id="train" label="Training" icon="🎯" />
+                <NavItem id="chat" label="KI-Tutor" icon="💬" />
+                <NavItem id="exam" label="Prüfung" icon="📝" />
+                {user.role === 'admin' && <NavItem id="admin" label="Verwaltung" icon="⚡" />}
+              </nav>
+              <div className="pt-6 mt-6 border-t border-slate-200/50 dark:border-slate-700/50 space-y-3">
+                 <div className="px-4 py-3 bg-white/50 dark:bg-slate-800/50 rounded-xl mb-2 flex items-center gap-3 border border-slate-100 dark:border-slate-700">
+                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs shadow-md">
+                     {user.username.charAt(0).toUpperCase()}
+                   </div>
+                   <div className="overflow-hidden">
+                     <div className="font-semibold text-sm truncate dark:text-slate-200">{user.username}</div>
+                     <div className="text-[10px] text-slate-500 uppercase tracking-wider font-bold">{user.role === 'admin' ? 'Administrator' : 'Anwärter'}</div>
+                   </div>
+                 </div>
+                 <div className="grid grid-cols-2 gap-2">
+                    <button onClick={toggleTheme} className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-slate-500 bg-white/50 dark:bg-slate-800/50 hover:bg-white dark:hover:bg-slate-800 transition-colors border border-slate-100 dark:border-slate-700">
+                        {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+                    </button>
+                    <button onClick={onLogout} className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-bold text-rose-500 bg-rose-50/50 dark:bg-rose-900/10 hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors border border-rose-100 dark:border-rose-900/30">
+                        Logout
+                    </button>
+                 </div>
+              </div>
+            </aside>
+            <div className="md:hidden fixed bottom-4 left-4 right-4 z-50">
+                <div className="glass-card rounded-2xl p-2 flex justify-around shadow-2xl border border-white/50">
+                    <button onClick={() => setView('dashboard')} className={`p-3 rounded-xl transition-all ${currentView === 'dashboard' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>📊</button>
+                    <button onClick={() => setView('train')} className={`p-3 rounded-xl transition-all ${currentView === 'train' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>🎯</button>
+                    <button onClick={() => setView('chat')} className={`p-3 rounded-xl transition-all ${currentView === 'chat' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>💬</button>
+                    <button onClick={() => setView('exam')} className={`p-3 rounded-xl transition-all ${currentView === 'exam' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>📝</button>
+                    {user.role === 'admin' && <button onClick={() => setView('admin')} className={`p-3 rounded-xl transition-all ${currentView === 'admin' ? 'bg-police-100 text-police-600 dark:bg-police-900/30 dark:text-police-400' : 'text-slate-400'}`}>⚡</button>}
+                    <button onClick={onLogout} className="p-3 rounded-xl text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20">🚪</button>
+                </div>
+            </div>
+            <main className="flex-1 md:ml-72 min-h-screen relative">
+                <div className="md:hidden flex justify-between items-center p-6 pb-2">
+                    <h1 className="font-bold text-xl text-slate-800 dark:text-white">Polizei Lerntool</h1>
+                    <button onClick={toggleTheme} className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 shadow flex items-center justify-center">{theme === 'dark' ? '☀️' : '🌙'}</button>
+                </div>
+                <div className="max-w-7xl mx-auto p-4 md:p-10 pb-28 md:pb-10">
+                   {children}
+                </div>
+            </main>
+          </div>
+        );
+      }
+
+      function Quiz({ question, idx, score, streak, onAnswer, onNext, onSkip, showExplain, onBookmark, isBookmarked, mode = 'training' }) {
+        const [selected, setSelected] = useState([]);
+        const [shuffled, setShuffled] = useState([]);
+
+        useEffect(() => {
+            if(!question) return;
+            const h = (str) => { let h=1779033703^str.length;for(let i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),3432918353);return ()=>Math.imul(h^h>>>16,2246822507)>>>0;}
+            const m = (a) => () => {let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);return((t^t>>>14)>>>0)/4294967296;}
+            const rng = m(h(`${question.id}#${idx}`)());
+            const a = [0,1,2,3,4];
+            for(let k=a.length-1;k>0;k--){const j=Math.floor(rng()*(k+1));[a[k],a[j]]=[a[j],a[k]];}
+            setShuffled(a);
+            setSelected([]);
+        }, [question, idx]);
+
+        if (!question) {
+          return (
+            <div className="flex flex-col items-center justify-center py-20 animate-fade-in text-center">
+              <div className="text-8xl mb-6 animate-bounce-sm">🎉</div>
+              <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-3">Keine Fragen verfügbar</h3>
+              <p className="text-slate-500 max-w-md">Ändere den Filter oder genieße deine Freizeit!</p>
+            </div>
+          );
+        }
+
+        const group = GROUPS.find(g => question.tags.some(t => g.tags.includes(t))) || GROUPS[GROUPS.length - 1];
+        const correctSet = new Set(question.correct);
+        const handleSelect = (i) => !showExplain && setSelected(p => p.includes(i) ? p.filter(x => x !== i) : [...p, i]);
+
+        return (
+          <div className="max-w-3xl mx-auto animate-slide-up pb-10">
+            <div className="flex justify-between items-end mb-6 px-1">
+              <div className="space-y-1">
+                <div className="flex gap-2">
+                    <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-${group.color}-100 text-${group.color}-700 dark:bg-${group.color}-900/40 dark:text-${group.color}-300 border border-${group.color}-200 dark:border-${group.color}-800`}>{group.title}</span>
+                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400">Level {question.difficulty}</span>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                 {mode === 'training' && (
+                    <div className="text-right">
+                        <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Streak</div>
+                        <div className="text-xl font-black text-orange-500 leading-none flex items-center justify-end gap-1">{streak} <span className="animate-pulse-slow">🔥</span></div>
+                    </div>
+                 )}
+                 <button onClick={() => onBookmark(question.id)} className={`text-2xl transition-transform active:scale-90 ${isBookmarked ? 'text-yellow-400 scale-110' : 'text-slate-300 hover:text-yellow-400'}`}>
+                    {isBookmarked ? '★' : '☆'}
+                 </button>
+              </div>
+            </div>
+
+            <GlassCard className="p-0 overflow-hidden border-0 shadow-2xl relative">
+              <div className={`h-1.5 w-full bg-gradient-to-r from-${group.color}-500 to-indigo-500`}></div>
+              <div className="p-6 md:p-8">
+                <h2 className="text-xl md:text-2xl font-semibold leading-relaxed mb-8 text-slate-800 dark:text-slate-100">{question.question}</h2>
+                <div className="space-y-3">
+                  {shuffled.map((origIdx, displayIdx) => {
+                    const txt = question.choices[origIdx];
+                    if (!txt) return null;
+                    const isSel = selected.includes(displayIdx);
+                    const isCor = correctSet.has(origIdx);
+                    
+                    let style = "border-slate-100 dark:border-slate-700/50 bg-white/50 dark:bg-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-700/50";
+                    let icon = <span className="text-xs font-bold text-slate-400">{String.fromCharCode(65 + displayIdx)}</span>;
+                    let iconBg = "border-2 border-slate-200 dark:border-slate-600";
+
+                    if (showExplain) {
+                      if (isCor) {
+                        style = "border-emerald-500/50 bg-emerald-50/50 dark:bg-emerald-900/20 shadow-[0_0_15px_rgba(16,185,129,0.1)]";
+                        icon = <span className="text-white text-xs">✓</span>;
+                        iconBg = "bg-emerald-500 border-emerald-500";
+                      } else if (isSel && !isCor) {
+                        style = "border-rose-500/50 bg-rose-50/50 dark:bg-rose-900/20";
+                        icon = <span className="text-white text-xs">✕</span>;
+                        iconBg = "bg-rose-500 border-rose-500";
+                      } else {
+                        style = "opacity-40 grayscale border-transparent";
+                      }
+                    } else if (isSel) {
+                      style = "border-police-500 bg-police-50/50 dark:bg-police-900/20 shadow-[0_0_15px_rgba(14,165,233,0.1)]";
+                      icon = <span className="text-white text-xs">✓</span>;
+                      iconBg = "bg-police-500 border-police-500";
+                    }
+
+                    return (
+                      <button key={displayIdx} onClick={() => handleSelect(displayIdx)} disabled={showExplain}
+                        className={`w-full text-left p-4 rounded-xl border transition-all duration-200 flex items-start gap-4 group relative overflow-hidden ${style}`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors mt-0.5 ${iconBg}`}>{icon}</div>
+                        <div className="text-base md:text-lg text-slate-700 dark:text-slate-200 leading-snug">{txt}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-700/50 flex flex-wrap gap-4 items-center justify-end">
+                  {!showExplain ? (
+                    <>
+                      <button onClick={onSkip} className="mr-auto text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 font-medium px-2 py-2 transition-colors text-sm">Überspringen</button>
+                      <button onClick={() => onAnswer(selected, shuffled)} disabled={!selected.length} className="bg-gradient-to-r from-police-600 to-indigo-600 hover:from-police-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-police-500/30 transition-all transform active:scale-95">
+                        {mode === 'exam' ? 'Einloggen' : 'Prüfen'}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="w-full animate-fade-in">
+                      <div className="bg-amber-50/50 dark:bg-amber-900/10 rounded-xl p-5 mb-6 border border-amber-100 dark:border-amber-900/30">
+                        <h4 className="font-bold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">💡 Erklärung</h4>
+                        <p className="text-slate-700 dark:text-slate-300 leading-relaxed mb-3 text-sm">{question.explain}</p>
+                        <span className="text-[10px] font-mono text-amber-700/70 dark:text-amber-400/70 border border-amber-200 dark:border-amber-800 px-2 py-1 rounded bg-white/50 dark:bg-black/20">§ {question.law_ref}</span>
+                      </div>
+                      <button onClick={onNext} className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white px-6 py-4 rounded-xl font-bold hover:shadow-xl transition-all flex items-center justify-center gap-2 group">
+                        Weiter <span className="group-hover:translate-x-1 transition-transform">➔</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+        );
+      }
+
+      function App() {
+        const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+        useEffect(() => {
+          document.documentElement.className = theme === 'dark' ? 'dark' : '';
+          localStorage.setItem('theme', theme);
+        }, [theme]);
+
+        const { questions, setQuestions } = useQuestions();
+        const { users, upsertUser, hashPassword } = useUsers();
+        
+        const [activeUserId, setActiveUserId] = useState(() => localStorage.getItem('activeUserId'));
+        const activeUser = useMemo(() => users.find(u => u.id === activeUserId) || null, [users, activeUserId]);
+        const [progress, updateProgress] = useProgress(activeUserId);
+
+        const [view, setView] = useState('dashboard');
+        
+        const [currentQuestionId, setCurrentQuestionId] = useState(null);
+        const [quizIdx, setQuizIdx] = useState(0); 
+        const [streak, setStreak] = useState(0);
+        const [showExplain, setShowExplain] = useState(false);
+        const [score, setScore] = useState(0);
+        const [filter, setFilter] = useState({ tags: [], difficulty: 0, bookmarkOnly: false });
+        const [adminSearch, setAdminSearch] = useState("");
+        const [examResults, setExamResults] = useState({ correct: 0, total: 0, done: false });
+
+        useEffect(() => { if(progress.totalCorrect) setScore(progress.totalCorrect * 10); }, [progress.totalCorrect]);
+
+        const handleLogin = (id) => { setActiveUserId(id); localStorage.setItem('activeUserId', id); setView('dashboard'); };
+        
+        const getCandidateQuestions = useCallback(() => {
+            let q = questions;
+            if (filter.bookmarkOnly) {
+                q = q.filter(x => (progress.bookmarks || []).includes(x.id));
+            } else if (filter.tags.length > 0) {
+                q = q.filter(x => x.tags.some(t => filter.tags.includes(t)));
+            }
+            return q;
+        }, [questions, filter, progress.bookmarks]);
+
+        // SMART SHUFFLE
+        const selectNextQuestion = useCallback(() => {
+            const candidates = getCandidateQuestions();
+            if (candidates.length === 0) return null;
+
+            if (view === 'exam') {
+                const idx = Math.floor(Math.random() * candidates.length);
+                return candidates[idx].id;
+            }
+
+            const weightedCandidates = candidates.map(q => {
+                const attempted = progress.attemptedIds[q.id] || 0;
+                const correct = progress.correctIds[q.id] || 0;
+                let weight = 100;
+
+                if (attempted === 0) {
+                    weight = 200; 
+                } else if (correct < attempted) {
+                    weight = 300; 
+                } else {
+                    weight = Math.max(10, 100 / (correct + 1));
+                }
+                return { id: q.id, weight };
+            });
+
+            const totalWeight = weightedCandidates.reduce((acc, c) => acc + c.weight, 0);
+            let r = Math.random() * totalWeight;
+            
+            for (const item of weightedCandidates) {
+                r -= item.weight;
+                if (r <= 0) return item.id;
+            }
+            return weightedCandidates[weightedCandidates.length - 1].id;
+        }, [getCandidateQuestions, progress, view]);
+
+        useEffect(() => {
+            if ((view === 'train' || view === 'exam') && !currentQuestionId) {
+                const nextId = selectNextQuestion();
+                if(nextId) setCurrentQuestionId(nextId);
+            }
+        }, [view, selectNextQuestion, currentQuestionId]);
+
+        useEffect(() => {
+            if (view === 'train') {
+                setShowExplain(false);
+                const nextId = selectNextQuestion();
+                setCurrentQuestionId(nextId);
+            }
+        }, [filter]);
+
+        const currentQuestion = useMemo(() => 
+            questions.find(q => q.id === currentQuestionId) || null
+        , [questions, currentQuestionId]);
+
+        const toggleBookmark = (id) => {
+            updateProgress(p => {
+                const b = p.bookmarks || [];
+                const next = b.includes(id) ? b.filter(x => x !== id) : [...b, id];
+                return { ...p, bookmarks: next };
+            });
+        };
+
+        const handleAnswer = (selectedDisplayIndices, shuffledOrder) => {
+           if(showExplain || !currentQuestion) return;
+           const selectedOriginals = selectedDisplayIndices.map(i => shuffledOrder[i]);
+           const correctSet = new Set(currentQuestion.correct);
+           const selectedSet = new Set(selectedOriginals);
+           const isCorrect = [0,1,2,3,4].every(i => correctSet.has(i) === selectedSet.has(i));
+           
+           if(view === 'exam') {
+               setExamResults(p => ({ ...p, total: p.total + 1, correct: p.correct + (isCorrect ? 1 : 0) }));
+               if(examResults.total >= 19) { 
+                   setExamResults(p => ({ ...p, done: true }));
+               } else {
+                   const nextId = selectNextQuestion();
+                   setCurrentQuestionId(nextId);
+                   setQuizIdx(i => i + 1);
+               }
+               return; 
+           }
+
+           setShowExplain(true);
+           if(isCorrect) { 
+               const newStreak = streak + 1;
+               setStreak(newStreak); 
+               setScore(s => s+10);
+               if(newStreak > 0 && newStreak % 5 === 0) fireConfetti();
+           } else {
+               setStreak(0);
+           }
+           
+           updateProgress(prev => {
+              const att = { ...prev.attemptedIds }; att[currentQuestion.id] = (att[currentQuestion.id] || 0) + 1;
+              const corr = { ...prev.correctIds }; if(isCorrect) corr[currentQuestion.id] = (corr[currentQuestion.id] || 0) + 1;
+              return { ...prev, totalAttempts: (prev.totalAttempts||0)+1, totalCorrect: (prev.totalCorrect||0)+(isCorrect?1:0), attemptedIds: att, correctIds: corr };
+           });
+        };
+
+        const nextQuestionAction = () => {
+            setShowExplain(false);
+            const nextId = selectNextQuestion();
+            setCurrentQuestionId(nextId);
+            setQuizIdx(i => i + 1);
+        };
+
+        const stats = useMemo(() => GROUPS.map(g => {
+            const gQ = questions.filter(q => q.tags.some(t => g.tags.includes(t)));
+            let att = 0, corr = 0;
+            gQ.forEach(q => { att += (progress.attemptedIds[q.id] || 0); corr += (progress.correctIds[q.id] || 0); });
+            return { ...g, total: gQ.length, attempted: att, correct: corr };
+        }), [questions, progress]);
+
+        if (!activeUser) return <Layout user={null}><AuthForm users={users} onLogin={handleLogin} onRegister={(u) => { upsertUser(u); handleLogin(u.id); }} upsertUser={upsertUser} /></Layout>;
+
+        if (view === 'admin') return (
+            <Layout user={activeUser} onLogout={() => handleLogin(null)} currentView="admin" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+                <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
+                    <div><h2 className="text-3xl font-bold text-slate-800 dark:text-white">Verwaltung</h2><p className="text-slate-500 mt-1">Fragenbank & Datenpflege</p></div>
+                    <div className="w-full md:w-auto"><input placeholder="Fragen durchsuchen..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 w-full md:w-64 focus:ring-2 focus:ring-police-500 outline-none" /></div>
+                </div>
+                <div className="grid lg:grid-cols-3 gap-6 animate-slide-up">
+                    <div className="lg:col-span-2 glass-card rounded-2xl overflow-hidden min-h-[400px] flex flex-col">
+                        <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center"><h3 className="font-bold text-slate-700 dark:text-slate-200">Alle Fragen ({questions.length})</h3></div>
+                        {questions.length === 0 ? (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                                <div className="text-4xl mb-4">📭</div>
+                                <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-2">Die Datenbank ist leer</h4>
+                                <p className="text-sm text-slate-500 mb-6">Importiere Fragen aus einer JSON-Datei oder lade die Standard-Fragen.</p>
+                                <button onClick={async () => {
+                                    if(!window.confirm('Standardfragen laden?')) return;
+                                    const batch = window.fb.writeBatch(window.fb.db);
+                                    DEFAULT_QUESTIONS.forEach(q => batch.set(window.fb.doc(window.fb.db, FIRESTORE_QUESTIONS, q.id), q));
+                                    await batch.commit();
+                                    alert(`${DEFAULT_QUESTIONS.length} Fragen geladen!`);
+                                }} className="px-6 py-3 bg-police-600 text-white rounded-xl font-bold hover:bg-police-700 transition-colors shadow-lg">Standardfragen laden</button>
+                            </div>
+                        ) : (
+                            <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-[500px]">
+                                {questions.filter(q => q.question.toLowerCase().includes(adminSearch.toLowerCase()) || q.id.includes(adminSearch)).map(q => (
+                                    <div key={q.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex justify-between gap-4 group bg-white dark:bg-slate-800">
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{q.question}</div>
+                                            <div className="flex gap-2 mt-1">{q.tags.map(t=><span key={t} className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-500">{t}</span>)}</div>
+                                        </div>
+                                        <button className="opacity-0 group-hover:opacity-100 text-xs text-rose-500 font-bold px-3 hover:bg-rose-50 rounded transition-all" onClick={() => { if(confirm('Löschen?')) { const batch=window.fb.writeBatch(window.fb.db); batch.set(window.fb.doc(window.fb.db, FIRESTORE_QUESTIONS, q.id), {...q,__deleted:true}); batch.commit(); } }}>Löschen</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                    <div className="space-y-6">
+                         <GlassCard className="p-6">
+                             <h3 className="font-bold mb-4">Import JSON</h3>
+                             <label className="block w-full border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-8 text-center cursor-pointer hover:border-police-400 hover:bg-police-50/50 transition-colors group">
+                                 <input type="file" className="hidden" onChange={async (e) => {
+                                     const f = e.target.files?.[0]; if(!f) return;
+                                     try {
+                                         const d = JSON.parse(await f.text());
+                                         if(Array.isArray(d)) {
+                                             const b = window.fb.writeBatch(window.fb.db);
+                                             d.forEach(x => { if(x.id) b.set(window.fb.doc(window.fb.db, FIRESTORE_QUESTIONS, x.id), x); });
+                                             await b.commit();
+                                             alert('Importiert!');
+                                         }
+                                     } catch { alert('Fehler'); }
+                                 }} />
+                                 <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">📂</div>
+                                 <div className="text-sm font-bold text-slate-500 group-hover:text-police-600">Datei auswählen</div>
+                             </label>
+                         </GlassCard>
+                    </div>
+                </div>
+            </Layout>
+        );
+
+        if (view === 'dashboard') return (
+            <Layout user={activeUser} onLogout={handleLogout} currentView="dashboard" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+                <div className="mb-10 animate-fade-in flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div>
+                        <h2 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">Hallo, {activeUser.username} 👋</h2>
+                        <p className="text-slate-500 dark:text-slate-400 mt-2 text-lg">Dein heutiges Lernziel wartet auf dich.</p>
+                    </div>
+                    <div className="flex gap-2">
+                        {user.role === 'admin' && <button onClick={() => setView('admin')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-xl text-sm font-bold">Verwaltung</button>}
+                        {progress.bookmarks && progress.bookmarks.length > 0 && (
+                            <button onClick={() => { setFilter({tags:[], difficulty:0, bookmarkOnly:true}); setView('train'); }} className="px-6 py-3 rounded-2xl bg-amber-100 text-amber-800 font-bold shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 hover:scale-105 transition-all flex items-center gap-2">
+                                <span>★</span> {progress.bookmarks.length} Gemerkte Fragen üben
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10 animate-slide-up">
+                    <StatCard label="Rang" value={rankFor(score)} icon="🏆" color="yellow" />
+                    <StatCard label="XP Gesamt" value={score} icon="⚡" color="indigo" />
+                    <StatCard label="Beantwortet" value={progress.totalAttempts} icon="📝" color="blue" />
+                    <StatCard label="Trefferquote" value={`${progress.totalAttempts ? Math.round((progress.totalCorrect/progress.totalAttempts)*100):0}%`} icon="🎯" color="emerald" />
+                </div>
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-3 text-slate-800 dark:text-white"><span className="w-1 h-6 bg-police-500 rounded-full"></span> Fachbereiche</h3>
+                <div className="grid md:grid-cols-2 gap-6 animate-slide-up" style={{animationDelay: '100ms'}}>
+                    {stats.map(s => {
+                        const pct = s.total ? Math.round((s.correct / Math.max(s.attempted, 1)) * 100) : 0;
+                        const cov = s.total ? Math.round((s.attempted / s.total) * 100) : 0;
+                        return (
+                            <GlassCard key={s.key} className="p-6 hover:shadow-lg transition-shadow">
+                                <div className="flex justify-between items-start mb-6">
+                                    <div><h4 className={`text-lg font-bold text-${s.color}-600 dark:text-${s.color}-400`}>{s.title}</h4><p className="text-xs font-bold text-slate-400 uppercase tracking-wider mt-1">{s.attempted} / {s.total} Fragen</p></div>
+                                    <div className={`text-xl font-black text-${s.color}-500/20`}>{pct}%</div>
+                                </div>
+                                <div className="space-y-4">
+                                    <div><div className="flex justify-between text-xs font-bold text-slate-500 mb-1.5"><span>Wissensstand</span> <span>{pct}%</span></div><div className="w-full bg-slate-100 dark:bg-slate-700/50 rounded-full h-2 overflow-hidden"><div className={`bg-${s.color}-500 h-full rounded-full transition-all duration-1000`} style={{width: `${pct}%`}}></div></div></div>
+                                    <div><div className="flex justify-between text-xs font-bold text-slate-500 mb-1.5"><span>Abdeckung</span> <span>{cov}%</span></div><div className="w-full bg-slate-100 dark:bg-slate-700/50 rounded-full h-2 overflow-hidden"><div className="bg-slate-300 dark:bg-slate-600 h-full rounded-full transition-all duration-1000" style={{width: `${cov}%`}}></div></div></div>
+                                </div>
+                            </GlassCard>
+                        )
+                    })}
+                </div>
+            </Layout>
+        );
+
+        if (view === 'exam') {
+            if(examResults.done) {
+                return (
+                    <Layout user={activeUser} onLogout={handleLogout} currentView="exam" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+                        <div className="flex flex-col items-center justify-center py-20 text-center animate-slide-up">
+                            <h2 className="text-3xl font-bold mb-4">Prüfung Beendet</h2>
+                            <div className="text-6xl font-black mb-2 text-police-600">{Math.round((examResults.correct/Math.max(examResults.total,1))*100)}%</div>
+                            <p className="text-slate-500 mb-8">{examResults.correct} von {examResults.total} richtig beantwortet</p>
+                            <button onClick={() => { setExamResults({correct:0,total:0,done:false}); setQuizIdx(0); setCurrentQuestionId(null); }} className="px-8 py-3 bg-police-600 text-white rounded-xl font-bold shadow-lg hover:bg-police-700 transition-colors">Neue Prüfung starten</button>
+                        </div>
+                    </Layout>
+                );
+            }
+            return (
+                <Layout user={activeUser} onLogout={handleLogout} currentView="exam" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+                   <div className="mb-6 flex justify-between items-center">
+                       <h2 className="text-xl font-bold">Prüfungsmodus</h2>
+                       <div className="bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded text-sm font-mono">Frage {examResults.total + 1} / 20</div>
+                   </div>
+                   <Quiz question={currentQuestion} idx={quizIdx} score={score} streak={streak} onAnswer={handleAnswer} onNext={()=>{}} onSkip={()=>{}} showExplain={false} onBookmark={toggleBookmark} isBookmarked={currentQuestion && (progress.bookmarks||[]).includes(currentQuestion.id)} mode="exam" />
+                </Layout>
+            );
+        }
+
+        if (view === 'chat') {
+            return (
+              <Layout user={activeUser} onLogout={handleLogout} currentView="chat" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+                 <Chat />
+              </Layout>
+            );
+        }
+
+        return (
+            <Layout user={activeUser} onLogout={handleLogout} currentView="train" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+                <div className="mb-6 flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
+                    <button onClick={() => setFilter({...filter, tags:[], bookmarkOnly:false})} className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${!filter.tags.length && !filter.bookmarkOnly ? 'bg-police-600 text-white shadow-lg shadow-police-500/30' : 'glass-card text-slate-500 hover:bg-white'}`}>Alle Bereiche</button>
+                    {GROUPS.map(g => (
+                        <button key={g.key} onClick={() => setFilter({...filter, tags:g.tags, bookmarkOnly:false})} className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${filter.tags[0]===g.tags[0] ? `bg-${g.color}-500 text-white shadow-lg shadow-${g.color}-500/30` : 'glass-card text-slate-500 hover:bg-white'}`}>{g.title}</button>
+                    ))}
+                    <button onClick={() => setFilter({...filter, bookmarkOnly:true, tags:[]})} className={`px-5 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all ${filter.bookmarkOnly ? 'bg-amber-400 text-white shadow-lg shadow-amber-500/30' : 'glass-card text-amber-500 hover:bg-white'}`}>★ Gemerkte</button>
+                </div>
+                <Quiz question={currentQuestion} idx={quizIdx} score={score} streak={streak} onAnswer={handleAnswer} onNext={nextQuestionAction} onSkip={nextQuestionAction} showExplain={showExplain} onBookmark={toggleBookmark} isBookmarked={currentQuestion && (progress.bookmarks||[]).includes(currentQuestion.id)} />
+            </Layout>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>
