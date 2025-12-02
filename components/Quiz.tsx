@@ -11,6 +11,7 @@ interface QuizProps {
   onNext: () => void;
   onSkip: () => void;
   showExplain: boolean;
+  mode?: string;
 }
 
 // Helper for shuffling
@@ -47,7 +48,7 @@ function seededShuffle(array: number[], seedStr: string) {
   return a;
 }
 
-export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnswer, onNext, onSkip, showExplain }) => {
+export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnswer, onNext, onSkip, showExplain, mode = 'training' }) => {
   const [selected, setSelected] = useState<number[]>([]);
 
   useEffect(() => {
@@ -58,6 +59,19 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
     if (!question) return [];
     return seededShuffle([0, 1, 2, 3, 4], `${question.id}#${idx}`);
   }, [question, idx]);
+
+  const isCorrectAnswer = useMemo(() => {
+    if (!question || !showExplain) return false;
+    const correctSet = new Set(question.correct);
+    const selectedOriginals = selected.map(i => displayOrder[i]);
+    const selectedSet = new Set(selectedOriginals);
+    
+    if (correctSet.size !== selectedSet.size) return false;
+    for (let elem of correctSet) {
+        if (!selectedSet.has(elem)) return false;
+    }
+    return true;
+  }, [question, showExplain, selected, displayOrder]);
 
   if (!question) {
     return (
@@ -96,13 +110,15 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
             </span>
         </div>
         <div className="flex items-center gap-4">
-             <div className="flex flex-col items-end">
-                 <span className="text-xs text-slate-400 uppercase font-bold">Streak</span>
-                 <div className="flex items-center text-orange-500 font-bold">
-                     <span className="text-lg">{streak}</span>
-                     <span className="ml-1 text-xl">🔥</span>
-                 </div>
-             </div>
+             {mode === 'training' && (
+               <div className="flex flex-col items-end">
+                   <span className="text-xs text-slate-400 uppercase font-bold">Streak</span>
+                   <div className="flex items-center text-orange-500 font-bold">
+                       <span className="text-lg">{streak}</span>
+                       <span className="ml-1 text-xl">🔥</span>
+                   </div>
+               </div>
+             )}
              <div className="flex flex-col items-end">
                  <span className="text-xs text-slate-400 uppercase font-bold">XP</span>
                  <span className="text-lg font-bold text-police-600 dark:text-police-400">{score}</span>
@@ -112,6 +128,19 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
 
       <Card className="p-0 overflow-hidden" gradient>
         <div className="p-6 md:p-8">
+            {/* Feedback Banner */}
+            {showExplain && (
+              <div className={`mb-8 p-6 rounded-2xl flex flex-col md:flex-row items-center gap-4 text-center md:text-left border-2 animate-bounce-sm transition-all shadow-sm ${isCorrectAnswer ? 'bg-emerald-50 border-emerald-400 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-rose-50 border-rose-400 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300'}`}>
+                  <div className={`text-5xl ${isCorrectAnswer ? 'animate-bounce' : 'animate-pulse'}`}>
+                      {isCorrectAnswer ? '👍' : '👎'}
+                  </div>
+                  <div>
+                      <h3 className="text-2xl font-black mb-1">{isCorrectAnswer ? 'Stark gemacht!' : 'Knapp daneben!'}</h3>
+                      <p className="font-medium opacity-90">{isCorrectAnswer ? 'Das war die absolut richtige Antwort.' : 'Lass den Kopf nicht hängen, schau dir die Erklärung an.'}</p>
+                  </div>
+              </div>
+            )}
+
             <h2 className="text-xl md:text-2xl font-semibold leading-relaxed mb-8 text-slate-800 dark:text-slate-100">
                 {question.question}
             </h2>
@@ -129,16 +158,16 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
 
                     if (showExplain) {
                         if (isCorrect) {
-                            stateClass = "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-500";
+                            stateClass = "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.2)]";
                             indicator = <div className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-sm">✓</div>;
                         } else if (isSelected && !isCorrect) {
                             stateClass = "border-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-500";
                             indicator = <div className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-sm font-bold">✕</div>;
                         } else {
-                            stateClass = "opacity-50 grayscale border-transparent";
+                            stateClass = "opacity-40 grayscale border-transparent";
                         }
                     } else if (isSelected) {
-                        stateClass = "border-police-500 bg-police-50 dark:bg-police-900/30 ring-1 ring-police-500";
+                        stateClass = "border-police-500 bg-police-50 dark:bg-police-900/30 ring-1 ring-police-500 shadow-[0_0_10px_rgba(14,165,233,0.2)]";
                         indicator = <div className="w-6 h-6 rounded-full bg-police-500 text-white flex items-center justify-center">✓</div>;
                     }
 
@@ -150,7 +179,7 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
                             className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group ${stateClass}`}
                         >
                             <div className="mt-0.5 shrink-0">{indicator}</div>
-                            <div className="text-lg text-slate-700 dark:text-slate-200">{choiceText}</div>
+                            <div className="text-lg text-slate-700 dark:text-slate-200 leading-snug">{choiceText}</div>
                         </button>
                     );
                 })}
@@ -172,20 +201,20 @@ export const Quiz: React.FC<QuizProps> = ({ question, idx, score, streak, onAnsw
                     </>
                 ) : (
                     <div className="w-full animate-fade-in">
-                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-5 mb-6 border border-slate-200 dark:border-slate-700">
-                            <h4 className="font-bold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                        <div className="bg-amber-50/60 dark:bg-amber-900/10 rounded-xl p-5 mb-6 border border-amber-200 dark:border-amber-800/50">
+                            <h4 className="font-bold text-amber-800 dark:text-amber-200 mb-2 flex items-center gap-2">
                                 💡 Erklärung
                             </h4>
-                            <p className="text-slate-600 dark:text-slate-300 leading-relaxed mb-4">{question.explain}</p>
-                            <div className="text-xs font-mono text-slate-400 bg-slate-200 dark:bg-slate-800 inline-block px-2 py-1 rounded">
-                                {question.law_ref}
+                            <p className="text-slate-700 dark:text-slate-300 leading-relaxed mb-4">{question.explain}</p>
+                            <div className="text-xs font-mono text-amber-700/70 dark:text-amber-400/70 bg-white/50 dark:bg-black/20 border border-amber-200 dark:border-amber-800 inline-block px-2 py-1 rounded">
+                                § {question.law_ref}
                             </div>
                         </div>
                         <button 
                             onClick={onNext}
-                            className="w-full bg-slate-800 dark:bg-white dark:text-slate-900 text-white px-6 py-3 rounded-xl font-bold hover:shadow-lg transition-all"
+                            className="w-full bg-slate-900 dark:bg-white dark:text-slate-900 text-white px-6 py-4 rounded-xl font-bold hover:shadow-xl transition-all flex items-center justify-center gap-2 group"
                         >
-                            Nächste Frage ➔
+                            Weiter <span className="group-hover:translate-x-1 transition-transform">➔</span>
                         </button>
                     </div>
                 )}

@@ -136,18 +136,6 @@
 
       .scrollbar-hide::-webkit-scrollbar { display: none; }
       .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      
-      input:-webkit-autofill,
-      input:-webkit-autofill:hover, 
-      input:-webkit-autofill:focus, 
-      input:-webkit-autofill:active{
-          -webkit-box-shadow: 0 0 0 30px white inset !important;
-          transition: background-color 5000s ease-in-out 0s;
-      }
-      .dark input:-webkit-autofill {
-          -webkit-box-shadow: 0 0 0 30px #1e293b inset !important;
-          -webkit-text-fill-color: white !important;
-      }
     </style>
 
     <!-- Firebase SDK Setup -->
@@ -188,7 +176,7 @@
       };
       window.dispatchEvent(new Event('firebase-ready'));
     </script>
-<script type="importmap">
+  <script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.0",
@@ -199,13 +187,14 @@
 }
 </script>
 </head>
-  <body class="bg-animated min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300 selection:bg-police-200 dark:selection:bg-police-900">
+  <body class="bg-animated min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300">
     <div id="root"></div>
 
     <script type="text/babel">
       const { useState, useEffect, useMemo, useCallback, useRef } = React;
 
-      // --- Constants ---
+      // --- Globals & Utils ---
+      
       const GROUPS = [
         { key:"BDG",   title:"Dienstrecht (BDG)",           tags:["BDG"], color: "yellow" },
         { key:"SPG",   title:"Sicherheitspolizei (SPG)",     tags:["SPG"], color: "blue" },
@@ -239,7 +228,40 @@
       const FIRESTORE_USERS = "users";
       const FIRESTORE_PROGRESS = "userProgress";
 
-      // --- Utils ---
+      // --- Random Utils (Same Instance) ---
+      function xmur3(str) {
+        let h = 1779033703 ^ str.length;
+        for (let i = 0; i < str.length; i++) {
+          h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+          h = h << 13 | h >>> 19;
+        }
+        return function() {
+          h = Math.imul(h ^ h >>> 16, 2246822507);
+          h = Math.imul(h ^ h >>> 13, 3266489909);
+          return (h ^ h >>> 16) >>> 0;
+        };
+      }
+
+      function mulberry32(a) {
+        return function() {
+          let t = a += 0x6D2B79F5;
+          t = Math.imul(t ^ t >>> 15, t | 1);
+          t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+          return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        };
+      }
+
+      function seededShuffle(array, seedStr) {
+        const seed = xmur3(seedStr)();
+        const rng = mulberry32(seed);
+        const a = [...array];
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(rng() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
       function hashPassword(str) {
         let hash = 0;
         str = str || "";
@@ -619,20 +641,138 @@
         );
       }
 
+      function QuestionEditor({ question, onSave, onCancel }) {
+        const [q, setQ] = useState(JSON.parse(JSON.stringify(question)));
+
+        const toggleCorrect = (idx) => {
+            const s = new Set(q.correct);
+            if(s.has(idx)) s.delete(idx); else s.add(idx);
+            setQ({...q, correct: Array.from(s).sort()});
+        };
+
+        const handleSave = (e) => {
+            e.preventDefault();
+            onSave(q);
+        }
+
+        return (
+            <div className="glass-card rounded-2xl p-6 shadow-xl border border-slate-200 dark:border-slate-700 max-w-4xl mx-auto animate-slide-up">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-slate-800 dark:text-white">Frage bearbeiten</h3>
+                    <div className="text-xs font-mono text-slate-400">{q.id}</div>
+                </div>
+                <form onSubmit={handleSave} className="space-y-6">
+                    <div>
+                        <label className="block text-sm font-bold mb-2 text-slate-600 dark:text-slate-400">Fragetext</label>
+                        <textarea 
+                            value={q.question} 
+                            onChange={e=>setQ({...q, question: e.target.value})} 
+                            className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 focus:ring-2 focus:ring-police-500 outline-none transition-all" 
+                            rows={3} 
+                            required 
+                        />
+                    </div>
+                    
+                    <div className="space-y-3">
+                        <label className="block text-sm font-bold text-slate-600 dark:text-slate-400">Antwortmöglichkeiten (Richtige ankreuzen)</label>
+                        {q.choices.map((c, i) => (
+                            <div key={i} className="flex gap-3 items-center group">
+                                <div className="relative flex items-center justify-center">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={q.correct.includes(i)} 
+                                        onChange={()=>toggleCorrect(i)} 
+                                        className="peer w-6 h-6 border-2 border-slate-300 rounded-md checked:bg-police-500 checked:border-police-500 transition-colors cursor-pointer appearance-none" 
+                                    />
+                                    <span className="absolute text-white text-xs opacity-0 peer-checked:opacity-100 pointer-events-none font-bold">✓</span>
+                                </div>
+                                <div className="flex-1 relative">
+                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">{String.fromCharCode(65+i)}</span>
+                                    <input 
+                                        value={c} 
+                                        onChange={e=> {
+                                            const newChoices = [...q.choices];
+                                            newChoices[i] = e.target.value;
+                                            setQ({...q, choices: newChoices});
+                                        }} 
+                                        className={`w-full pl-8 pr-4 py-3 rounded-xl border transition-all outline-none ${q.correct.includes(i) ? 'border-police-500 bg-police-50 dark:bg-police-900/20' : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 focus:border-police-400'}`} 
+                                        placeholder={`Antwort ${String.fromCharCode(65+i)}`} 
+                                        required 
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-bold mb-2 text-slate-600 dark:text-slate-400">Tags (Komma getrennt)</label>
+                            <input 
+                                value={q.tags.join(', ')} 
+                                onChange={e=>setQ({...q, tags: e.target.value.split(',').map(t=>t.trim()).filter(Boolean)})} 
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 focus:ring-2 focus:ring-police-500 outline-none" 
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-bold mb-2 text-slate-600 dark:text-slate-400">Rechtsgrundlage</label>
+                            <input 
+                                value={q.law_ref} 
+                                onChange={e=>setQ({...q, law_ref: e.target.value})} 
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 focus:ring-2 focus:ring-police-500 outline-none" 
+                            />
+                        </div>
+                        <div>
+                             <label className="block text-sm font-bold mb-2 text-slate-600 dark:text-slate-400">Schwierigkeit (1-5)</label>
+                             <input 
+                                type="number" 
+                                min="1" max="5" 
+                                value={q.difficulty} 
+                                onChange={e=>setQ({...q, difficulty: parseInt(e.target.value)})} 
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 focus:ring-2 focus:ring-police-500 outline-none" 
+                            />
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold mb-2 text-slate-600 dark:text-slate-400">Erklärung (Feedback)</label>
+                        <textarea 
+                            value={q.explain} 
+                            onChange={e=>setQ({...q, explain: e.target.value})} 
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800/50 focus:ring-2 focus:ring-police-500 outline-none" 
+                            rows={3} 
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-6 border-t border-slate-100 dark:border-slate-700">
+                        <button type="button" onClick={onCancel} className="px-6 py-3 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold transition-colors">Abbrechen</button>
+                        <button type="submit" className="px-8 py-3 bg-gradient-to-r from-police-600 to-indigo-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all">Speichern</button>
+                    </div>
+                </form>
+            </div>
+        );
+      }
+
       function Quiz({ question, idx, score, streak, onAnswer, onNext, onSkip, showExplain, onBookmark, isBookmarked, mode = 'training' }) {
         const [selected, setSelected] = useState([]);
         const [shuffled, setShuffled] = useState([]);
 
         useEffect(() => {
             if(!question) return;
-            const h = (str) => { let h=1779033703^str.length;for(let i=0;i<str.length;i++)h=Math.imul(h^str.charCodeAt(i),3432918353);return ()=>Math.imul(h^h>>>16,2246822507)>>>0;}
-            const m = (a) => () => {let t=a+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);return((t^t>>>14)>>>0)/4294967296;}
-            const rng = m(h(`${question.id}#${idx}`)());
-            const a = [0,1,2,3,4];
-            for(let k=a.length-1;k>0;k--){const j=Math.floor(rng()*(k+1));[a[k],a[j]]=[a[j],a[k]];}
+            const a = seededShuffle([0,1,2,3,4], `${question.id}#${idx}`);
             setShuffled(a);
             setSelected([]);
         }, [question, idx]);
+
+        // Calculate correctness locally for instant feedback
+        const isCorrectAnswer = useMemo(() => {
+             if(!question || !showExplain) return false;
+             const correctSet = new Set(question.correct);
+             const selectedOriginals = selected.map(i => shuffled[i]);
+             const selectedSet = new Set(selectedOriginals);
+             if (correctSet.size !== selectedSet.size) return false;
+             for (let elem of correctSet) if (!selectedSet.has(elem)) return false;
+             return true;
+        }, [question, showExplain, selected, shuffled]);
 
         if (!question) {
           return (
@@ -673,6 +813,19 @@
             <GlassCard className="p-0 overflow-hidden border-0 shadow-2xl relative">
               <div className={`h-1.5 w-full bg-gradient-to-r from-${group.color}-500 to-indigo-500`}></div>
               <div className="p-6 md:p-8">
+                {/* Feedback Banner */}
+                {showExplain && (
+                  <div className={`mb-8 p-6 rounded-2xl flex flex-col md:flex-row items-center gap-4 text-center md:text-left border-2 animate-bounce-sm transition-all shadow-sm ${isCorrectAnswer ? 'bg-emerald-50 border-emerald-400 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-300' : 'bg-rose-50 border-rose-400 text-rose-800 dark:bg-rose-900/20 dark:text-rose-300'}`}>
+                      <div className={`text-5xl ${isCorrectAnswer ? 'animate-bounce' : 'animate-pulse'}`}>
+                          {isCorrectAnswer ? '👍' : '👎'}
+                      </div>
+                      <div>
+                          <h3 className="text-2xl font-black mb-1">{isCorrectAnswer ? 'Stark gemacht!' : 'Knapp daneben!'}</h3>
+                          <p className="font-medium opacity-90">{isCorrectAnswer ? 'Das war die absolut richtige Antwort.' : 'Lass den Kopf nicht hängen, schau dir die Erklärung an.'}</p>
+                      </div>
+                  </div>
+                )}
+
                 <h2 className="text-xl md:text-2xl font-semibold leading-relaxed mb-8 text-slate-800 dark:text-slate-100">{question.question}</h2>
                 <div className="space-y-3">
                   {shuffled.map((origIdx, displayIdx) => {
@@ -764,6 +917,7 @@
         const [filter, setFilter] = useState({ tags: [], difficulty: 0, bookmarkOnly: false });
         const [adminSearch, setAdminSearch] = useState("");
         const [examResults, setExamResults] = useState({ correct: 0, total: 0, done: false });
+        const [editingQuestion, setEditingQuestion] = useState(null);
 
         useEffect(() => { if(progress.totalCorrect) setScore(progress.totalCorrect * 10); }, [progress.totalCorrect]);
 
@@ -899,66 +1053,92 @@
 
         if (!activeUser) return <Layout user={null}><AuthForm users={users} onLogin={handleLogin} onRegister={(u) => { upsertUser(u); handleLogin(u.id); }} upsertUser={upsertUser} hashPassword={hashPassword} /></Layout>;
 
-        if (view === 'admin') return (
-            <Layout user={activeUser} onLogout={handleLogout} currentView="admin" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
-                <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
-                    <div><h2 className="text-3xl font-bold text-slate-800 dark:text-white">Verwaltung</h2><p className="text-slate-500 mt-1">Fragenbank & Datenpflege</p></div>
-                    <div className="w-full md:w-auto"><input placeholder="Fragen durchsuchen..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 w-full md:w-64 focus:ring-2 focus:ring-police-500 outline-none" /></div>
-                </div>
-                <div className="grid lg:grid-cols-3 gap-6 animate-slide-up">
-                    <div className="lg:col-span-2 glass-card rounded-2xl overflow-hidden min-h-[400px] flex flex-col">
-                        <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center"><h3 className="font-bold text-slate-700 dark:text-slate-200">Alle Fragen ({questions.length})</h3></div>
-                        {questions.length === 0 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                                <div className="text-4xl mb-4">📭</div>
-                                <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-2">Die Datenbank ist leer</h4>
-                                <p className="text-sm text-slate-500 mb-6">Importiere Fragen aus einer JSON-Datei oder lade die Standard-Fragen.</p>
-                                <button onClick={async () => {
-                                    if(!window.confirm('Standardfragen laden?')) return;
-                                    const batch = window.fb.writeBatch(window.fb.db);
-                                    DEFAULT_QUESTIONS.forEach(q => batch.set(window.fb.doc(window.fb.db, FIRESTORE_QUESTIONS, q.id), q));
-                                    await batch.commit();
-                                    alert(`${DEFAULT_QUESTIONS.length} Fragen geladen!`);
-                                }} className="px-6 py-3 bg-police-600 text-white rounded-xl font-bold hover:bg-police-700 transition-colors shadow-lg">Standardfragen laden</button>
-                            </div>
-                        ) : (
-                            <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-[500px]">
-                                {questions.filter(q => (q.question || "").toLowerCase().includes((adminSearch || "").toLowerCase()) || (q.id || "").includes(adminSearch)).map(q => (
-                                    <div key={q.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex justify-between gap-4 group bg-white dark:bg-slate-800">
-                                        <div className="min-w-0">
-                                            <div className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{q.question}</div>
-                                            <div className="flex gap-2 mt-1">{q.tags.map(t=><span key={t} className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-500">{t}</span>)}</div>
+        if (view === 'admin') {
+             if (editingQuestion) {
+                 return (
+                    <Layout user={activeUser} onLogout={handleLogout} currentView="admin" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+                        <QuestionEditor 
+                            question={editingQuestion} 
+                            onSave={async (q) => {
+                                if(window.fb && window.fb.db) {
+                                    const { db, doc, setDoc } = window.fb;
+                                    await setDoc(doc(db, FIRESTORE_QUESTIONS, q.id), q, { merge: true });
+                                    alert('Gespeichert!');
+                                    setEditingQuestion(null);
+                                } else {
+                                    alert('Offline - Änderungen können nicht gespeichert werden.');
+                                }
+                            }}
+                            onCancel={() => setEditingQuestion(null)}
+                        />
+                    </Layout>
+                 );
+             }
+
+             return (
+                <Layout user={activeUser} onLogout={handleLogout} currentView="admin" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+                    <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
+                        <div><h2 className="text-3xl font-bold text-slate-800 dark:text-white">Verwaltung</h2><p className="text-slate-500 mt-1">Fragenbank & Datenpflege</p></div>
+                        <div className="w-full md:w-auto"><input placeholder="Fragen durchsuchen..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 w-full md:w-64 focus:ring-2 focus:ring-police-500 outline-none" /></div>
+                    </div>
+                    <div className="grid lg:grid-cols-3 gap-6 animate-slide-up">
+                        <div className="lg:col-span-2 glass-card rounded-2xl overflow-hidden min-h-[400px] flex flex-col">
+                            <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex justify-between items-center"><h3 className="font-bold text-slate-700 dark:text-slate-200">Alle Fragen ({questions.length})</h3></div>
+                            {questions.length === 0 ? (
+                                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+                                    <div className="text-4xl mb-4">📭</div>
+                                    <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-2">Die Datenbank ist leer</h4>
+                                    <p className="text-sm text-slate-500 mb-6">Importiere Fragen aus einer JSON-Datei oder lade die Standard-Fragen.</p>
+                                    <button onClick={async () => {
+                                        if(!window.confirm('Standardfragen laden?')) return;
+                                        const batch = window.fb.writeBatch(window.fb.db);
+                                        DEFAULT_QUESTIONS.forEach(q => batch.set(window.fb.doc(window.fb.db, FIRESTORE_QUESTIONS, q.id), q));
+                                        await batch.commit();
+                                        alert(`${DEFAULT_QUESTIONS.length} Fragen geladen!`);
+                                    }} className="px-6 py-3 bg-police-600 text-white rounded-xl font-bold hover:bg-police-700 transition-colors shadow-lg">Standardfragen laden</button>
+                                </div>
+                            ) : (
+                                <div className="flex-1 overflow-y-auto p-2 space-y-2 max-h-[500px]">
+                                    {questions.filter(q => (q.question || "").toLowerCase().includes((adminSearch || "").toLowerCase()) || (q.id || "").includes(adminSearch)).map(q => (
+                                        <div key={q.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex justify-between gap-4 group bg-white dark:bg-slate-800">
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{q.question}</div>
+                                                <div className="flex gap-2 mt-1">{q.tags.map(t=><span key={t} className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-500">{t}</span>)}</div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <button className="opacity-0 group-hover:opacity-100 text-xs text-police-600 font-bold px-3 py-1 bg-police-50 hover:bg-police-100 rounded transition-all" onClick={() => setEditingQuestion(q)}>Bearbeiten</button>
+                                                <button className="opacity-0 group-hover:opacity-100 text-xs text-rose-500 font-bold px-3 py-1 bg-rose-50 hover:bg-rose-100 rounded transition-all" onClick={() => { if(confirm('Löschen?')) { const batch=window.fb.writeBatch(window.fb.db); batch.set(window.fb.doc(window.fb.db, FIRESTORE_QUESTIONS, q.id), {...q,__deleted:true}); batch.commit(); } }}>Löschen</button>
+                                            </div>
                                         </div>
-                                        <button className="opacity-0 group-hover:opacity-100 text-xs text-rose-500 font-bold px-3 hover:bg-rose-50 rounded transition-all" onClick={() => { if(confirm('Löschen?')) { const batch=window.fb.writeBatch(window.fb.db); batch.set(window.fb.doc(window.fb.db, FIRESTORE_QUESTIONS, q.id), {...q,__deleted:true}); batch.commit(); } }}>Löschen</button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="space-y-6">
+                             <GlassCard className="p-6">
+                                 <h3 className="font-bold mb-4">Import JSON</h3>
+                                 <label className="block w-full border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-8 text-center cursor-pointer hover:border-police-400 hover:bg-police-50/50 transition-colors group">
+                                     <input type="file" className="hidden" onChange={async (e) => {
+                                         const f = e.target.files?.[0]; if(!f) return;
+                                         try {
+                                             const d = JSON.parse(await f.text());
+                                             if(Array.isArray(d)) {
+                                                 const b = window.fb.writeBatch(window.fb.db);
+                                                 d.forEach(x => { if(x.id) b.set(window.fb.doc(window.fb.db, FIRESTORE_QUESTIONS, x.id), x); });
+                                                 await b.commit();
+                                                 alert('Importiert!');
+                                             }
+                                         } catch { alert('Fehler'); }
+                                     }} />
+                                     <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">📂</div>
+                                     <div className="text-sm font-bold text-slate-500 group-hover:text-police-600">Datei auswählen</div>
+                                 </label>
+                             </GlassCard>
+                        </div>
                     </div>
-                    <div className="space-y-6">
-                         <GlassCard className="p-6">
-                             <h3 className="font-bold mb-4">Import JSON</h3>
-                             <label className="block w-full border-2 border-dashed border-slate-200 dark:border-slate-600 rounded-xl p-8 text-center cursor-pointer hover:border-police-400 hover:bg-police-50/50 transition-colors group">
-                                 <input type="file" className="hidden" onChange={async (e) => {
-                                     const f = e.target.files?.[0]; if(!f) return;
-                                     try {
-                                         const d = JSON.parse(await f.text());
-                                         if(Array.isArray(d)) {
-                                             const b = window.fb.writeBatch(window.fb.db);
-                                             d.forEach(x => { if(x.id) b.set(window.fb.doc(window.fb.db, FIRESTORE_QUESTIONS, x.id), x); });
-                                             await b.commit();
-                                             alert('Importiert!');
-                                         }
-                                     } catch { alert('Fehler'); }
-                                 }} />
-                                 <div className="text-3xl mb-2 group-hover:scale-110 transition-transform">📂</div>
-                                 <div className="text-sm font-bold text-slate-500 group-hover:text-police-600">Datei auswählen</div>
-                             </label>
-                         </GlassCard>
-                    </div>
-                </div>
-            </Layout>
-        );
+                </Layout>
+            );
+        }
 
         if (view === 'dashboard') return (
             <Layout user={activeUser} onLogout={handleLogout} currentView="dashboard" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
