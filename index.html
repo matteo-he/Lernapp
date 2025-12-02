@@ -81,21 +81,22 @@
 
     <!-- Import Map for Gemini SDK -->
     <script type="importmap">
-    {
-      "imports": {
-        "@google/genai": "https://esm.run/@google/genai",
-        "react": "https://aistudiocdn.com/react@^19.2.0",
-        "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-        "react/": "https://aistudiocdn.com/react@^19.2.0/"
-      }
-    }
-    </script>
+{
+  "imports": {
+    "@google/genai": "https://esm.run/@google/genai",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/"
+  }
+}
+</script>
 
     <!-- Process Env Shim for API Key -->
     <script>
       window.process = window.process || { env: {} };
-      // HINWEIS: Hier könnte der API Key für lokale Tests eingefügt werden, wenn sicher.
-      // window.process.env.API_KEY = "DEIN_KEY_HIER";
+      // ⚠️ WICHTIG: Ersetzen Sie den leeren String unten mit Ihrem Gemini API Key, damit der Chat funktioniert.
+      // Lassen Sie dies leer, wenn Sie den Chat nicht nutzen möchten.
+      window.process.env.API_KEY = ""; 
     </script>
 
     <!-- Styles -->
@@ -169,11 +170,15 @@
       }
     </style>
 
-    <!-- Firebase SDK Setup -->
+    <!-- Firebase SDK Setup & Gemini Loader -->
     <script type="module">
       import { initializeApp, getApp, getApps } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
       import { getFirestore, collection, doc, writeBatch, onSnapshot, setDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
       import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-auth.js";
+      import { GoogleGenAI } from "@google/genai";
+
+      // Make Gemini available globally for the Babel script
+      window.GoogleGenAI = GoogleGenAI;
 
       const firebaseConfig = {
         apiKey: "AIzaSyDLH5c69JKeFWcJyBpzRUfv720KjnnRIU8",
@@ -210,11 +215,6 @@
   </head>
   <body class="bg-animated min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300 selection:bg-police-200 dark:selection:bg-police-900">
     <div id="root"></div>
-
-    <script type="module">
-      import { GoogleGenAI } from "@google/genai";
-      window.GoogleGenAI = GoogleGenAI;
-    </script>
 
     <script type="text/babel">
       const { useState, useEffect, useMemo, useCallback, useRef } = React;
@@ -580,11 +580,10 @@
             try {
                 if(!window.GoogleGenAI) throw new Error("Gemini SDK not loaded");
                 
-                // Use process.env.API_KEY as requested. Shim is provided in head for safety.
                 const apiKey = process.env.API_KEY;
                 
                 if (!apiKey) {
-                    throw new Error("API Key fehlt. Bitte konfiguriere process.env.API_KEY.");
+                    throw new Error("API Key fehlt. Bitte konfiguriere process.env.API_KEY im HTML-Code.");
                 }
 
                 const ai = new window.GoogleGenAI({ apiKey });
@@ -602,7 +601,9 @@
 
             } catch (error) {
                 console.error("Chat Error", error);
-                const errorMsg = { id: (Date.now() + 1).toString(), role: 'model', text: 'Fehler: API Key fehlt oder Verbindungsproblem. (Prüfe die Konsole)', timestamp: Date.now() };
+                let msg = 'Fehler: API Key fehlt oder Verbindungsproblem. (Prüfe die Konsole)';
+                if(error.message && error.message.includes("API Key")) msg = error.message;
+                const errorMsg = { id: (Date.now() + 1).toString(), role: 'model', text: msg, timestamp: Date.now() };
                 setMessages(prev => [...prev, errorMsg]);
             } finally {
                 setIsLoading(false);
@@ -886,6 +887,12 @@
 
         const handleLogin = (id) => { setActiveUserId(id); localStorage.setItem('activeUserId', id); setView('dashboard'); };
         
+        const handleLogout = () => {
+          setActiveUserId(null);
+          localStorage.removeItem('activeUserId');
+          setView('dashboard');
+        };
+
         const getCandidateQuestions = useCallback(() => {
             let q = questions;
             if (filter.bookmarkOnly) {
@@ -1011,7 +1018,7 @@
         if (!activeUser) return <Layout user={null}><AuthForm users={users} onLogin={handleLogin} onRegister={(u) => { upsertUser(u); handleLogin(u.id); }} upsertUser={upsertUser} /></Layout>;
 
         if (view === 'admin') return (
-            <Layout user={activeUser} onLogout={() => handleLogin(null)} currentView="admin" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
+            <Layout user={activeUser} onLogout={handleLogout} currentView="admin" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
                 <div className="flex flex-col md:flex-row justify-between items-end mb-6 gap-4">
                     <div><h2 className="text-3xl font-bold text-slate-800 dark:text-white">Verwaltung</h2><p className="text-slate-500 mt-1">Fragenbank & Datenpflege</p></div>
                     <div className="w-full md:w-auto"><input placeholder="Fragen durchsuchen..." value={adminSearch} onChange={e => setAdminSearch(e.target.value)} className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 w-full md:w-64 focus:ring-2 focus:ring-police-500 outline-none" /></div>
@@ -1079,7 +1086,7 @@
                         <p className="text-slate-500 dark:text-slate-400 mt-2 text-lg">Dein heutiges Lernziel wartet auf dich.</p>
                     </div>
                     <div className="flex gap-2">
-                        {user.role === 'admin' && <button onClick={() => setView('admin')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-xl text-sm font-bold">Verwaltung</button>}
+                        {activeUser.role === 'admin' && <button onClick={() => setView('admin')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-xl text-sm font-bold">Verwaltung</button>}
                         {progress.bookmarks && progress.bookmarks.length > 0 && (
                             <button onClick={() => { setFilter({tags:[], difficulty:0, bookmarkOnly:true}); setView('train'); }} className="px-6 py-3 rounded-2xl bg-amber-100 text-amber-800 font-bold shadow-lg shadow-amber-500/10 hover:shadow-amber-500/20 hover:scale-105 transition-all flex items-center gap-2">
                                 <span>★</span> {progress.bookmarks.length} Gemerkte Fragen üben
