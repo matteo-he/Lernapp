@@ -58,8 +58,8 @@
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0",
+    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime?deps=react@18.2.0",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
     "react/": "https://aistudiocdn.com/react@^19.2.0/"
   }
@@ -106,5 +106,14 @@
   <body class="bg-animated min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300">
     <div id="root"></div>
     <script type="text/babel" data-type="module" src="./index.tsx"></script>
+    <script>
+      window.onerror = function(message, source, lineno, colno, error) {
+        console.error("Global Error Caught:", message, error);
+        // Fallback UI injection if React completely fails
+        if (document.getElementById('root').innerHTML === "") {
+             document.getElementById('root').innerHTML = '<div style="padding:20px;text-align:center;font-family:sans-serif;margin-top:50px;"><h1>Ladefehler</h1><p>Die Anwendung konnte nicht initialisiert werden.</p><button onclick="window.location.reload()" style="padding:10px 20px;margin-top:10px;cursor:pointer;">Neu laden</button></div>';
+        }
+      };
+    </script>
   </body>
 </html>

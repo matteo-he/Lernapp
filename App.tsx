@@ -264,7 +264,7 @@ export default function App() {
 
   const stats = useMemo(() => {
     return GROUPS.map(g => {
-        const groupQuestions = questions.filter(q => (q.tags || []).some(t => g.tags.includes(t)));
+        const groupQuestions = (questions || []).filter(q => (q.tags || []).some(t => g.tags.includes(t)));
         let attempted = 0; let correct = 0;
         groupQuestions.forEach(q => { attempted += (progress.attemptedIds[q.id] || 0); correct += (progress.correctIds[q.id] || 0); });
         return { ...g, total: groupQuestions.length, attempted, correct };
@@ -384,7 +384,7 @@ export default function App() {
                         <div className="flex justify-between"><h2 className="text-3xl font-bold">Verwaltung</h2><button className="text-sm bg-slate-200 px-3 py-1 rounded" onClick={() => setEditingQuestion({id: 'new-'+Date.now(), question:'', choices:['','','',''], correct:[], explain:'', tags:[], law_ref:'', last_checked:'', difficulty:1} as any)}>+ Neu</button></div>
                         <input value={adminSearch} onChange={e=>setAdminSearch(e.target.value)} placeholder="Frage suchen..." className="w-full p-2 border rounded" />
                         <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                            {questions
+                            {(questions || [])
                                 .filter(q => (q.question || "").toLowerCase().includes((adminSearch || "").toLowerCase()))
                                 .map(q => (
                                     <div key={q.id} className="p-3 bg-white dark:bg-slate-800 rounded border flex justify-between items-center">
@@ -392,7 +392,7 @@ export default function App() {
                                         <button onClick={() => setEditingQuestion(q)} className="p-2 hover:bg-slate-100 rounded">✏️</button>
                                     </div>
                             ))}
-                            {questions.length === 0 && <div className="text-center text-slate-400 p-4">Keine Fragen gefunden.</div>}
+                            {(questions || []).length === 0 && <div className="text-center text-slate-400 p-4">Keine Fragen gefunden.</div>}
                         </div>
                     </div>
                 )}
