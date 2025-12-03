@@ -39,7 +39,8 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       );
     }
 
-    return this.props.children;
+    // Fix: Cast 'this' to 'any' to resolve "Property 'props' does not exist on type 'ErrorBoundary'"
+    return (this as any).props.children;
   }
 }
 

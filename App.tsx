@@ -3,7 +3,6 @@ import { useQuestions, useUsers, useProgress } from './hooks/useDataSync.ts';
 import { Layout } from './components/Layout.tsx';
 import { GlassCard } from './components/Card.tsx';
 import { Quiz } from './components/Quiz.tsx';
-import { Chat } from './components/Chat.tsx';
 import { Question, GROUPS, FilterState } from './types.ts';
 import { collection, doc, writeBatch, dbInstance, setDoc } from './services/firebase.ts';
 
@@ -350,8 +349,6 @@ export default function App() {
                 />
             </div>
         )}
-        
-        {view === 'chat' && <Chat />}
         
         {view === 'admin' && (
             <div className="animate-fade-in">
