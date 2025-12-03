@@ -7,6 +7,19 @@ const FIRESTORE_QUESTIONS = "questions";
 const FIRESTORE_USERS = "users";
 const FIRESTORE_PROGRESS = "userProgress";
 
+// Safe defaults to prevent crashes if DB data is partial
+const DEFAULT_QUESTION: Omit<Question, 'id'> = {
+    question: "",
+    choices: ["", "", "", ""],
+    correct: [],
+    explain: "",
+    law_ref: "",
+    tags: [],
+    last_checked: new Date().toISOString(),
+    difficulty: 1,
+    __deleted: false
+};
+
 function cloneValue<T>(value: T): T {
     if (Array.isArray(value)) return value.map(cloneValue) as unknown as T;
     if (value && typeof value === "object") return JSON.parse(JSON.stringify(value));
@@ -58,7 +71,14 @@ export function useQuestions() {
                 snapshot.forEach((doc: any) => {
                     const data = doc.data();
                     if (!data.__deleted) {
-                        remote.push({ ...data, id: doc.id });
+                        // Merge with defaults to ensure all fields exist (prevents undefined crashes)
+                        const safeData = { ...DEFAULT_QUESTION, ...data };
+                        // Ensure arrays are actually arrays
+                        if (!Array.isArray(safeData.choices)) safeData.choices = [];
+                        if (!Array.isArray(safeData.correct)) safeData.correct = [];
+                        if (!Array.isArray(safeData.tags)) safeData.tags = [];
+                        
+                        remote.push({ ...safeData, id: doc.id });
                     }
                 });
                 
@@ -83,9 +103,6 @@ export function useQuestions() {
 
     const setQuestions = useCallback((newQuestions: Question[]) => {
         setQuestionsState(newQuestions);
-        // In a real app, we'd queue writes here. 
-        // For this demo, we assume writes happen via the Admin panel directly to Firestore 
-        // OR local state is optimistic.
     }, []);
 
     return { questions, setQuestions, status };
@@ -109,7 +126,6 @@ export function useUsers() {
             return onSnapshot(collection(dbInstance, FIRESTORE_USERS), (snap: any) => {
                 const remote: User[] = [];
                 snap.forEach((d: any) => remote.push(d.data() as User));
-                // Filter sensitive admin for safety if needed, though client-side logic isn't secure enough for real secrets
                 setUsersState(remote);
             });
         };

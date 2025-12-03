@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuestions, useUsers, useProgress } from './hooks/useDataSync.ts';
 import { Layout } from './components/Layout.tsx';
 import { GlassCard } from './components/Card.tsx';
@@ -155,11 +155,17 @@ export default function App() {
 
   React.useEffect(() => { if(progress.totalCorrect) setScore(progress.totalCorrect * 10); }, [progress.totalCorrect]);
 
+  // Reset quiz index when filtering changes to prevent seeing "All done" or jumping to random questions
+  useEffect(() => {
+    setQuizIdx(0);
+    setShowExplain(false);
+  }, [filter, view]);
+
   const handleLogin = (id: string) => { setActiveUserId(id); localStorage.setItem('activeUserId', id); setView('dashboard'); };
   const handleLogout = () => { setActiveUserId(null); localStorage.removeItem('activeUserId'); setView('dashboard'); };
 
   const getCandidateQuestions = useMemo(() => {
-      let q = questions;
+      let q = questions || []; // Default to empty array safety
       if (view === 'review') {
           const now = Date.now();
           return q.filter(x => {
@@ -169,11 +175,15 @@ export default function App() {
           });
       }
       if (filter.bookmarkOnly) q = q.filter(x => (progress.bookmarks || []).includes(x.id));
-      else if (filter.tags.length > 0) q = q.filter(x => x.tags.some(t => filter.tags.includes(t)));
+      else if (filter.tags.length > 0) q = q.filter(x => (x.tags || []).some(t => filter.tags.includes(t)));
       
       if (filter.searchQuery.trim()) {
           const term = filter.searchQuery.toLowerCase();
-          q = q.filter(x => x.question.toLowerCase().includes(term) || x.explain.toLowerCase().includes(term) || x.tags.some(t => t.toLowerCase().includes(term)));
+          q = q.filter(x => 
+              (x.question || "").toLowerCase().includes(term) || 
+              (x.explain || "").toLowerCase().includes(term) || 
+              (x.tags || []).some(t => t.toLowerCase().includes(term))
+          );
       }
       return q;
   }, [questions, filter, progress.bookmarks, progress.reviewQueue, progress.nextReviewDate, view]);
@@ -245,7 +255,7 @@ export default function App() {
 
   const stats = useMemo(() => {
     return GROUPS.map(g => {
-        const groupQuestions = questions.filter(q => q.tags.some(t => g.tags.includes(t)));
+        const groupQuestions = questions.filter(q => (q.tags || []).some(t => g.tags.includes(t)));
         let attempted = 0; let correct = 0;
         groupQuestions.forEach(q => { attempted += (progress.attemptedIds[q.id] || 0); correct += (progress.correctIds[q.id] || 0); });
         return { ...g, total: groupQuestions.length, attempted, correct };
@@ -366,9 +376,10 @@ export default function App() {
                         <div className="flex justify-between"><h2 className="text-3xl font-bold">Verwaltung</h2><button className="text-sm bg-slate-200 px-3 py-1 rounded" onClick={() => setEditingQuestion({id: 'new-'+Date.now(), question:'', choices:['','','',''], correct:[], explain:'', tags:[], law_ref:'', last_checked:'', difficulty:1} as any)}>+ Neu</button></div>
                         <input value={adminSearch} onChange={e=>setAdminSearch(e.target.value)} placeholder="Frage suchen..." className="w-full p-2 border rounded" />
                         <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                            {questions.filter(q => q.question.toLowerCase().includes(adminSearch.toLowerCase())).map(q => (
+                            {/* Added safety check (q.question || "") to prevent crashes on bad data */}
+                            {questions.filter(q => (q.question || "").toLowerCase().includes((adminSearch || "").toLowerCase())).map(q => (
                                 <div key={q.id} className="p-3 bg-white dark:bg-slate-800 rounded border flex justify-between items-center">
-                                    <div className="truncate flex-1 pr-4">{q.question}</div>
+                                    <div className="truncate flex-1 pr-4">{q.question || "Ohne Titel"}</div>
                                     <button onClick={() => setEditingQuestion(q)}>✏️</button>
                                 </div>
                             ))}
