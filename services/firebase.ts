@@ -11,36 +11,51 @@ const firebaseConfig = {
   appId: "1:28649721297:web:432abbe98e34dd50fc24f0"
 };
 
-let app: FirebaseApp;
-let db: Firestore;
-let auth: Auth;
-let authReadyPromise: Promise<FirebaseUser | null>;
+let app: FirebaseApp | undefined;
+let db: Firestore | undefined;
+let auth: Auth | undefined;
+let authReadyPromise: Promise<FirebaseUser | null> = Promise.resolve(null);
 
 try {
-    app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    auth = getAuth(app);
+    if (getApps().length === 0) {
+        app = initializeApp(firebaseConfig);
+    } else {
+        app = getApp();
+    }
     
-    authReadyPromise = new Promise((resolve) => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                resolve(user);
-                unsubscribe();
-            } else {
-                signInAnonymously(auth).catch((err) => {
-                    console.error("Anon Auth failed", err);
-                    resolve(null);
-                });
+    if (app) {
+        db = getFirestore(app);
+        auth = getAuth(app);
+        
+        authReadyPromise = new Promise((resolve) => {
+            if (!auth) {
+                resolve(null);
+                return;
             }
+            const unsubscribe = onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    resolve(user);
+                    unsubscribe();
+                } else {
+                    signInAnonymously(auth).then((userCred) => {
+                         // Authenticated anonymously
+                    }).catch((err) => {
+                        console.warn("Anon Auth failed, offline mode", err);
+                        resolve(null);
+                    });
+                }
+            });
         });
-    });
+    }
 
 } catch (e) {
-    console.error("Firebase init error", e);
+    console.error("Firebase init critical error - App will run in Offline Mode", e);
 }
 
+// Export safe accessors
 export const dbInstance = db;
 export const authInstance = auth;
 export const ensureAuth = () => authReadyPromise;
 
+// Re-export firebase functions so consumers don't need to import from URL directly
 export { collection, doc, writeBatch, onSnapshot, setDoc };

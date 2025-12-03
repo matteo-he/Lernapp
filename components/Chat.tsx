@@ -52,21 +52,19 @@ export const Chat: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Use explicit casting or fallback to ensure process.env access
       const apiKey = process.env.API_KEY || (window as any).process?.env?.API_KEY;
       if (!apiKey) throw new Error("API Key missing");
 
       const ai = new GoogleGenAI({ apiKey });
       
-      // Construct history for context
-      const history = messages.map(m => ({
+      const historyParts = messages.map(m => ({
           role: m.role,
           parts: [{ text: m.text }]
       }));
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: [...history, { role: 'user', parts: [{ text: userText }] }],
+        contents: [...historyParts, { role: 'user', parts: [{ text: userText }] }],
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
           temperature: 0.4, 
@@ -93,7 +91,8 @@ export const Chat: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[75vh] md:h-[82vh]">
+    // Use h-[calc(100vh-140px)] or flex-1 to fill available space properly in the layout
+    <div className="flex flex-col h-[calc(100vh-120px)] md:h-[calc(100vh-100px)] animate-fade-in">
       <div className="mb-4 shrink-0">
         <h2 className="text-3xl font-bold text-slate-800 dark:text-white">KI-Tutor</h2>
         <p className="text-slate-500 dark:text-slate-400">Stelle Fragen zu BDG, SPG, StVO und mehr.</p>
@@ -101,7 +100,7 @@ export const Chat: React.FC = () => {
 
       <Card className="flex-1 flex flex-col min-h-0 overflow-hidden border border-slate-200 dark:border-slate-700 shadow-xl bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
         
-        {/* Messages Area */}
+        {/* Messages Area - flex-1 and min-h-0 are critical for scrolling inside flex container */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-slate-50/50 dark:bg-slate-950/50 scroll-smooth">
           {messages.map((msg) => {
             const isUser = msg.role === 'user';
@@ -148,7 +147,7 @@ export const Chat: React.FC = () => {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Frage stellen (z.B. 'Was sind die Pflichten nach § 43 BDG?')"
+              placeholder="Frage stellen..."
               className="w-full pl-4 pr-12 py-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-police-500 outline-none transition-all shadow-inner text-slate-800 dark:text-slate-100"
               disabled={isLoading}
             />
@@ -157,14 +156,9 @@ export const Chat: React.FC = () => {
               disabled={!input.trim() || isLoading}
               className="absolute right-2 p-2 bg-police-600 hover:bg-police-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 text-white rounded-lg transition-colors shadow-md"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-                <path d="M3.478 2.404a.75.75 0 0 0-.926.941l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.404Z" />
-              </svg>
+              ➤
             </button>
           </form>
-          <div className="text-center mt-2">
-             <span className="text-[10px] text-slate-400">Powered by Gemini 2.5 Flash. Antworten können Fehler enthalten. Überprüfe wichtige Fakten im Gesetz.</span>
-          </div>
         </div>
       </Card>
     </div>
