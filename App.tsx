@@ -4,9 +4,9 @@ import { Layout } from './components/Layout.tsx';
 import { GlassCard } from './components/Card.tsx';
 import { Quiz } from './components/Quiz.tsx';
 import { Question, GROUPS, FilterState } from './types.ts';
-import { collection, doc, writeBatch, dbInstance, setDoc } from './services/firebase.ts';
+import { doc, dbInstance, setDoc } from './services/firebase.ts';
 
-// --- Helper Functions (Moved outside component) ---
+// --- Helper Functions ---
 function xmur3(str: string) {
   let h = 1779033703 ^ str.length;
   for(let i=0;i<str.length;i++) h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
@@ -77,13 +77,13 @@ const AuthForm = ({ onLogin, onRegister, users, hashPassword }: any) => {
         setError("");
         if (!name.trim()) return setError("Name fehlt");
         if (isLogin) {
-            const u = users.find((u: any) => (u.username||"").toLowerCase() === name.toLowerCase());
+            const u = users.find((u: any) => (u.username||"").toLowerCase() === name.trim().toLowerCase());
             if (u && u.passwordHash === hashPassword(pass)) onLogin(u.id);
             else setError("Ungültige Daten");
         } else {
-            if (users.find((u: any) => (u.username||"").toLowerCase() === name.toLowerCase())) return setError("Name vergeben");
+            if (users.find((u: any) => (u.username||"").toLowerCase() === name.trim().toLowerCase())) return setError("Name vergeben");
             const id = `user-${Date.now()}`;
-            onRegister({ id, username: name, passwordHash: hashPassword(pass), role: 'user' });
+            onRegister({ id, username: name.trim(), passwordHash: hashPassword(pass), role: 'user' });
         }
     };
 
@@ -148,6 +148,8 @@ export default function App() {
   const [showExplain, setShowExplain] = useState(false);
   const [score, setScore] = useState(0);
   const [feedbackMeta, setFeedbackMeta] = useState<{ label: string, isCorrect: boolean } | null>(null);
+  
+  // Filter state
   const [filter, setFilter] = useState<FilterState>({ tags: [], difficulty: 0, bookmarkOnly: false, searchQuery: "" });
   const [adminSearch, setAdminSearch] = useState("");
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -155,7 +157,7 @@ export default function App() {
 
   React.useEffect(() => { if(progress.totalCorrect) setScore(progress.totalCorrect * 10); }, [progress.totalCorrect]);
 
-  // Reset quiz index when filtering changes to prevent seeing "All done" or jumping to random questions
+  // Reset quiz index when filtering changes or view changes
   useEffect(() => {
     setQuizIdx(0);
     setShowExplain(false);
@@ -165,7 +167,7 @@ export default function App() {
   const handleLogout = () => { setActiveUserId(null); localStorage.removeItem('activeUserId'); setView('dashboard'); };
 
   const getCandidateQuestions = useMemo(() => {
-      let q = questions || []; // Default to empty array safety
+      let q = questions || []; 
       if (view === 'review') {
           const now = Date.now();
           return q.filter(x => {
@@ -174,9 +176,15 @@ export default function App() {
               return inQueue && nextDate <= now;
           });
       }
-      if (filter.bookmarkOnly) q = q.filter(x => (progress.bookmarks || []).includes(x.id));
-      else if (filter.tags.length > 0) q = q.filter(x => (x.tags || []).some(t => filter.tags.includes(t)));
       
+      // Filter logic
+      if (filter.bookmarkOnly) {
+          q = q.filter(x => (progress.bookmarks || []).includes(x.id));
+      } else if (filter.tags.length > 0) {
+          q = q.filter(x => (x.tags || []).some(t => filter.tags.includes(t)));
+      }
+      
+      // Search logic - robust against null values
       if (filter.searchQuery.trim()) {
           const term = filter.searchQuery.toLowerCase();
           q = q.filter(x => 
@@ -185,6 +193,7 @@ export default function App() {
               (x.tags || []).some(t => t.toLowerCase().includes(term))
           );
       }
+      
       return q;
   }, [questions, filter, progress.bookmarks, progress.reviewQueue, progress.nextReviewDate, view]);
 
@@ -288,7 +297,6 @@ export default function App() {
                     {activeUser.role === 'admin' && <button onClick={() => setView('admin')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 rounded-xl font-bold">Verwaltung</button>}
                  </div>
                  
-                 {/* Review Card */}
                  <div onClick={() => { if(progress.reviewQueue?.length > 0) { setView('review'); setQuizIdx(0); } }}
                     className={`rounded-2xl p-6 cursor-pointer relative overflow-hidden transition-all ${progress.reviewQueue?.length > 0 ? 'bg-gradient-to-r from-rose-500 to-orange-600 shadow-xl' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`}>
                      <div className="relative z-10 flex justify-between items-center">
@@ -376,15 +384,16 @@ export default function App() {
                         <div className="flex justify-between"><h2 className="text-3xl font-bold">Verwaltung</h2><button className="text-sm bg-slate-200 px-3 py-1 rounded" onClick={() => setEditingQuestion({id: 'new-'+Date.now(), question:'', choices:['','','',''], correct:[], explain:'', tags:[], law_ref:'', last_checked:'', difficulty:1} as any)}>+ Neu</button></div>
                         <input value={adminSearch} onChange={e=>setAdminSearch(e.target.value)} placeholder="Frage suchen..." className="w-full p-2 border rounded" />
                         <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                            {/* Added safety check (q.question || "") to prevent crashes on bad data */}
-                            {questions.filter(q => (q.question || "").toLowerCase().includes((adminSearch || "").toLowerCase())).map(q => (
-                                <div key={q.id} className="p-3 bg-white dark:bg-slate-800 rounded border flex justify-between items-center">
-                                    <div className="truncate flex-1 pr-4">{q.question || "Ohne Titel"}</div>
-                                    <button onClick={() => setEditingQuestion(q)}>✏️</button>
-                                </div>
+                            {questions
+                                .filter(q => (q.question || "").toLowerCase().includes((adminSearch || "").toLowerCase()))
+                                .map(q => (
+                                    <div key={q.id} className="p-3 bg-white dark:bg-slate-800 rounded border flex justify-between items-center">
+                                        <div className="truncate flex-1 pr-4 font-medium">{q.question || "Unbenannte Frage"}</div>
+                                        <button onClick={() => setEditingQuestion(q)} className="p-2 hover:bg-slate-100 rounded">✏️</button>
+                                    </div>
                             ))}
+                            {questions.length === 0 && <div className="text-center text-slate-400 p-4">Keine Fragen gefunden.</div>}
                         </div>
-                        {/* Import/Export could go here */}
                     </div>
                 )}
             </div>
