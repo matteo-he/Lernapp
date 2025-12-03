@@ -37,13 +37,6 @@ export interface FilterState {
   searchQuery: string;
 }
 
-export interface ChatMessage {
-  id: string;
-  role: 'user' | 'model';
-  text: string;
-  timestamp: number;
-}
-
 export interface AppStats {
   total: number;
   attempted: number;
