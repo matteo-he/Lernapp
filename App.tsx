@@ -1,12 +1,11 @@
-
 import React, { useState, useMemo } from 'react';
-import { useQuestions, useUsers, useProgress } from './hooks/useDataSync';
-import { Layout } from './components/Layout';
-import { GlassCard } from './components/Card';
-import { Quiz } from './components/Quiz';
-import { Chat } from './components/Chat';
-import { Question, GROUPS, FilterState } from './types';
-import { collection, doc, writeBatch, dbInstance, setDoc } from './services/firebase';
+import { useQuestions, useUsers, useProgress } from './hooks/useDataSync.ts';
+import { Layout } from './components/Layout.tsx';
+import { GlassCard } from './components/Card.tsx';
+import { Quiz } from './components/Quiz.tsx';
+import { Chat } from './components/Chat.tsx';
+import { Question, GROUPS, FilterState } from './types.ts';
+import { collection, doc, writeBatch, dbInstance, setDoc } from './services/firebase.ts';
 
 // Helper for ranking
 const RANKS = [
@@ -58,6 +57,138 @@ function getSRSLabel(level: number): string {
         default: return "Lange Zeit";
     }
 }
+
+// Subcomponents
+
+const StatCard = ({ label, value, icon, color }: any) => {
+    // Basic mapping for stat cards
+    const colors: any = {
+        yellow: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600',
+        blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600',
+        indigo: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600',
+        emerald: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
+    };
+    return (
+        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4 hover:scale-[1.02] transition-transform">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${colors[color] || colors.blue}`}>
+                {icon}
+            </div>
+            <div>
+                <div className="text-sm text-slate-500 dark:text-slate-400">{label}</div>
+                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{value}</div>
+            </div>
+        </div>
+    );
+};
+
+const AuthForm = ({ onLogin, onRegister, users, hashPassword }: any) => {
+    const [isLogin, setIsLogin] = useState(true);
+    const [name, setName] = useState("");
+    const [pass, setPass] = useState("");
+    const [error, setError] = useState("");
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        setError("");
+        if (!name.trim()) return setError("Name fehlt");
+        
+        if (isLogin) {
+            const u = users.find((u: any) => (u.username||"").toLowerCase() === name.toLowerCase());
+            if (u && u.passwordHash === hashPassword(pass)) onLogin(u.id);
+            else setError("Ungültige Daten");
+        } else {
+            if (users.find((u: any) => (u.username||"").toLowerCase() === name.toLowerCase())) return setError("Name vergeben");
+            const id = `user-${Date.now()}`;
+            onRegister({ id, username: name, passwordHash: hashPassword(pass), role: 'user' });
+        }
+    };
+
+    return (
+        <form onSubmit={submit} className="space-y-4">
+            <div>
+                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Benutzername</label>
+                <input value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-police-500 outline-none" placeholder="Max" />
+            </div>
+            <div>
+                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Passwort</label>
+                <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-police-500 outline-none" placeholder="••••" />
+            </div>
+            {error && <div className="text-rose-500 text-sm">{error}</div>}
+            <button type="submit" className="w-full bg-police-600 text-white py-3 rounded-lg font-bold hover:bg-police-700 transition-colors shadow-lg shadow-police-500/20">
+                {isLogin ? 'Anmelden' : 'Registrieren'}
+            </button>
+            <div className="text-center text-sm text-slate-500 cursor-pointer hover:underline hover:text-police-600" onClick={() => setIsLogin(!isLogin)}>
+                {isLogin ? 'Noch keinen Account? Registrieren' : 'Zurück zum Login'}
+            </div>
+        </form>
+    );
+};
+
+const QuestionEditor = ({ question, onSave, onCancel }: any) => {
+    const [q, setQ] = useState(JSON.parse(JSON.stringify(question)));
+
+    const toggleCorrect = (idx: number) => {
+        const s = new Set(q.correct);
+        if(s.has(idx)) s.delete(idx); else s.add(idx);
+        setQ({...q, correct: Array.from(s).sort()});
+    };
+
+    const handleSave = (e: React.FormEvent) => {
+        e.preventDefault();
+        onSave(q);
+    }
+
+    return (
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 max-w-4xl mx-auto">
+            <h3 className="text-xl font-bold mb-6">Frage bearbeiten: {q.id}</h3>
+            <form onSubmit={handleSave} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-bold">Frage</label>
+                    <textarea value={q.question} onChange={e=>setQ({...q, question: e.target.value})} className="w-full p-3 border rounded-lg bg-transparent dark:border-slate-600" rows={3} required />
+                </div>
+                
+                <div className="grid gap-2">
+                    <label className="block text-sm font-bold mt-2">Antworten (Richtige anhaken)</label>
+                    {q.choices.map((c: string, i: number) => (
+                        <div key={i} className="flex gap-3 items-center">
+                            <input type="checkbox" checked={q.correct.includes(i)} onChange={()=>toggleCorrect(i)} className="w-5 h-5 accent-police-600" />
+                            <input value={c} onChange={e=> {
+                                const newChoices = [...q.choices];
+                                newChoices[i] = e.target.value;
+                                setQ({...q, choices: newChoices});
+                            }} className="flex-1 p-2 border rounded-lg bg-transparent dark:border-slate-600" placeholder={`Antwort ${String.fromCharCode(65+i)}`} required />
+                        </div>
+                    ))}
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4 mt-2">
+                    <div>
+                        <label className="block text-sm font-bold mb-1">Tags (Komma getrennt)</label>
+                        <input value={q.tags.join(', ')} onChange={e=>setQ({...q, tags: e.target.value.split(',').map((t:string)=>t.trim()).filter(Boolean)})} className="w-full p-2 border rounded-lg bg-transparent dark:border-slate-600" />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-bold mb-1">Rechtsgrundlage</label>
+                        <input value={q.law_ref} onChange={e=>setQ({...q, law_ref: e.target.value})} className="w-full p-2 border rounded-lg bg-transparent dark:border-slate-600" />
+                    </div>
+                    <div>
+                         <label className="block text-sm font-bold mb-1">Schwierigkeit (1-5)</label>
+                         <input type="number" min="1" max="5" value={q.difficulty} onChange={e=>setQ({...q, difficulty: parseInt(e.target.value)})} className="w-full p-2 border rounded-lg bg-transparent dark:border-slate-600" />
+                    </div>
+                </div>
+
+                <div>
+                    <label className="block text-sm font-bold mb-1">Erklärung</label>
+                    <textarea value={q.explain} onChange={e=>setQ({...q, explain: e.target.value})} className="w-full p-3 border rounded-lg bg-transparent dark:border-slate-600" rows={3} />
+                </div>
+
+                <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
+                    <button type="button" onClick={onCancel} className="px-4 py-2 text-slate-500 hover:text-slate-700 font-bold">Abbrechen</button>
+                    <button type="submit" className="px-6 py-2 bg-police-600 text-white rounded-lg font-bold shadow hover:bg-police-700">Speichern</button>
+                </div>
+            </form>
+        </div>
+    );
+};
 
 export default function App() {
   // Theme State
@@ -794,284 +925,4 @@ export default function App() {
          )}
       </Layout>
     );
-  }
-
-  // Review View (Fehler-Archiv)
-  if (view === 'review') {
-      const reviewQueueCount = (progress.reviewQueue || []).length;
-      const questionDisplay = showExplain ? frozenQuestion : currentQuestion;
-
-      return (
-        <Layout user={activeUser} onLogout={handleLogout} currentView="dashboard" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                     <h2 className="text-xl font-bold text-rose-600 dark:text-rose-400 flex items-center gap-2">
-                        <span>🩹</span> Fehler-Archiv
-                     </h2>
-                     <p className="text-sm text-slate-500 dark:text-slate-400">Beantworte Fragen richtig, um sie in die Zukunft zu schieben.</p>
-                </div>
-                <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 px-3 py-1 rounded-full text-sm font-bold">
-                    {reviewQueueCount} im System
-                </div>
-            </div>
-
-            <Quiz 
-                question={questionDisplay} 
-                idx={quizIdx} 
-                score={score}
-                streak={streak}
-                onAnswer={handleAnswer} 
-                onNext={nextQuestion} 
-                onSkip={nextQuestion}
-                showExplain={showExplain}
-                onBookmark={toggleBookmark}
-                isBookmarked={questionDisplay && (progress.bookmarks || []).includes(questionDisplay.id)}
-                srsLevel={questionDisplay ? (progress.reviewStreak?.[questionDisplay.id] || 0) : 0}
-                feedbackMeta={feedbackMeta}
-            />
-        </Layout>
-      );
-  }
-
-  // Chat View
-  if (view === 'chat') {
-    return (
-      <Layout user={activeUser} onLogout={handleLogout} currentView="chat" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
-         <Chat />
-      </Layout>
-    );
-  }
-
-  // Exam View
-  if (view === 'exam') {
-      if(examResults.done) {
-        return (
-            <Layout user={activeUser} onLogout={handleLogout} currentView="exam" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
-                <div className="flex flex-col items-center justify-center py-20 text-center animate-slide-up">
-                    <h2 className="text-3xl font-bold mb-4">Prüfung Beendet</h2>
-                    <div className="text-6xl font-black mb-2 text-police-600">{Math.round((examResults.correct/Math.max(examResults.total,1))*100)}%</div>
-                    <p className="text-slate-500 mb-8">{examResults.correct} von {examResults.total} richtig beantwortet</p>
-                    <button onClick={() => { setExamResults({correct:0,total:0,done:false}); setQuizIdx(0); }} className="px-8 py-3 bg-police-600 text-white rounded-xl font-bold shadow-lg hover:bg-police-700 transition-colors">Neue Prüfung starten</button>
-                </div>
-            </Layout>
-        );
-      }
-      return (
-        <Layout user={activeUser} onLogout={handleLogout} currentView="exam" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
-            <div className="mb-6 flex justify-between items-center">
-                <h2 className="text-xl font-bold">Prüfungsmodus</h2>
-                <div className="bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded text-sm font-mono">Frage {examResults.total + 1} / 20</div>
-            </div>
-            <Quiz 
-                question={currentQuestion} 
-                idx={quizIdx} 
-                score={score} 
-                streak={streak} 
-                onAnswer={handleAnswer} 
-                onNext={()=>{}} 
-                onSkip={()=>{}} 
-                showExplain={false} 
-                mode="exam"
-                onBookmark={toggleBookmark}
-                isBookmarked={currentQuestion && (progress.bookmarks || []).includes(currentQuestion.id)}
-            />
-        </Layout>
-      );
-  }
-
-  // Training View
-  const questionDisplay = showExplain ? frozenQuestion : currentQuestion;
-  return (
-    <Layout user={activeUser} onLogout={handleLogout} currentView="train" setView={setView} theme={theme} toggleTheme={() => setTheme(t => t === 'light' ? 'dark' : 'light')}>
-        {/* Search Bar */}
-        <div className="mb-4 relative group">
-             <input 
-                type="text" 
-                placeholder="Fragen durchsuchen (z.B. 'Alkohol', 'Notwehr', '§ 43')..."
-                value={filter.searchQuery}
-                onChange={(e) => setFilter({...filter, searchQuery: e.target.value})}
-                className="w-full pl-10 pr-10 py-3.5 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 focus:border-police-500 dark:focus:border-police-500 focus:ring-0 outline-none transition-all shadow-sm text-slate-700 dark:text-slate-200 font-medium group-hover:border-slate-300 dark:group-hover:border-slate-600"
-             />
-             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xl">🔍</span>
-             {filter.searchQuery && (
-                <button 
-                    onClick={() => setFilter({...filter, searchQuery: ''})}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-700 rounded-full w-6 h-6 flex items-center justify-center text-xs transition-colors"
-                >
-                    ✕
-                </button>
-             )}
-        </div>
-
-        <div className="mb-6 flex overflow-x-auto gap-2 pb-2 scrollbar-hide">
-            <button 
-                onClick={() => setFilter({ ...filter, tags: [], bookmarkOnly: false })}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${!filter.bookmarkOnly && filter.tags.length === 0 ? 'bg-police-600 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`}
-            >
-                Alle Bereiche
-            </button>
-            {GROUPS.map(g => (
-                <button 
-                    key={g.key}
-                    onClick={() => setFilter({ ...filter, tags: g.tags, bookmarkOnly: false })}
-                    className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${!filter.bookmarkOnly && filter.tags[0] === g.tags[0] ? `bg-${g.color}-500 text-white` : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700'}`}
-                >
-                    {g.title}
-                </button>
-            ))}
-            <button 
-                onClick={() => setFilter({ ...filter, bookmarkOnly: true, tags: [] })}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${filter.bookmarkOnly ? 'bg-amber-400 text-white' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-amber-500'}`}
-            >
-                ★ Gemerkte
-            </button>
-        </div>
-
-        <Quiz 
-            question={questionDisplay} 
-            idx={quizIdx} 
-            score={score}
-            streak={streak}
-            onAnswer={handleAnswer} 
-            onNext={nextQuestion} 
-            onSkip={nextQuestion}
-            showExplain={showExplain}
-            onBookmark={toggleBookmark}
-            isBookmarked={questionDisplay && (progress.bookmarks || []).includes(questionDisplay.id)}
-            feedbackMeta={feedbackMeta}
-        />
-    </Layout>
-  );
 }
-
-// Subcomponents
-
-const StatCard = ({ label, value, icon, color }: any) => {
-    // Basic mapping for stat cards
-    const colors: any = {
-        yellow: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600',
-        blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600',
-        indigo: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600',
-        emerald: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
-    };
-    return (
-        <div className="bg-white dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4 hover:scale-[1.02] transition-transform">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl ${colors[color] || colors.blue}`}>
-                {icon}
-            </div>
-            <div>
-                <div className="text-sm text-slate-500 dark:text-slate-400">{label}</div>
-                <div className="text-xl font-bold text-slate-800 dark:text-slate-100">{value}</div>
-            </div>
-        </div>
-    );
-};
-
-const AuthForm = ({ onLogin, onRegister, users, hashPassword }: any) => {
-    const [isLogin, setIsLogin] = useState(true);
-    const [name, setName] = useState("");
-    const [pass, setPass] = useState("");
-    const [error, setError] = useState("");
-
-    const submit = (e: React.FormEvent) => {
-        e.preventDefault();
-        setError("");
-        if (!name.trim()) return setError("Name fehlt");
-        
-        if (isLogin) {
-            const u = users.find((u: any) => (u.username||"").toLowerCase() === name.toLowerCase());
-            if (u && u.passwordHash === hashPassword(pass)) onLogin(u.id);
-            else setError("Ungültige Daten");
-        } else {
-            if (users.find((u: any) => (u.username||"").toLowerCase() === name.toLowerCase())) return setError("Name vergeben");
-            const id = `user-${Date.now()}`;
-            onRegister({ id, username: name, passwordHash: hashPassword(pass), role: 'user' });
-        }
-    };
-
-    return (
-        <form onSubmit={submit} className="space-y-4">
-            <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Benutzername</label>
-                <input value={name} onChange={e => setName(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-police-500 outline-none" placeholder="Max" />
-            </div>
-            <div>
-                <label className="block text-sm font-medium mb-1 text-slate-700 dark:text-slate-300">Passwort</label>
-                <input type="password" value={pass} onChange={e => setPass(e.target.value)} className="w-full px-4 py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 focus:ring-2 focus:ring-police-500 outline-none" placeholder="••••" />
-            </div>
-            {error && <div className="text-rose-500 text-sm">{error}</div>}
-            <button type="submit" className="w-full bg-police-600 text-white py-3 rounded-lg font-bold hover:bg-police-700 transition-colors shadow-lg shadow-police-500/20">
-                {isLogin ? 'Anmelden' : 'Registrieren'}
-            </button>
-            <div className="text-center text-sm text-slate-500 cursor-pointer hover:underline hover:text-police-600" onClick={() => setIsLogin(!isLogin)}>
-                {isLogin ? 'Noch keinen Account? Registrieren' : 'Zurück zum Login'}
-            </div>
-        </form>
-    );
-};
-
-const QuestionEditor = ({ question, onSave, onCancel }: any) => {
-    const [q, setQ] = useState(JSON.parse(JSON.stringify(question)));
-
-    const toggleCorrect = (idx: number) => {
-        const s = new Set(q.correct);
-        if(s.has(idx)) s.delete(idx); else s.add(idx);
-        setQ({...q, correct: Array.from(s).sort()});
-    };
-
-    const handleSave = (e: React.FormEvent) => {
-        e.preventDefault();
-        onSave(q);
-    }
-
-    return (
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-lg border border-slate-200 dark:border-slate-700 max-w-4xl mx-auto">
-            <h3 className="text-xl font-bold mb-6">Frage bearbeiten: {q.id}</h3>
-            <form onSubmit={handleSave} className="space-y-4">
-                <div>
-                    <label className="block text-sm font-bold mb-1">Frage</label>
-                    <textarea value={q.question} onChange={e=>setQ({...q, question: e.target.value})} className="w-full p-3 border rounded-lg bg-transparent dark:border-slate-600" rows={3} required />
-                </div>
-                
-                <div className="grid gap-2">
-                    <label className="block text-sm font-bold mt-2">Antworten (Richtige anhaken)</label>
-                    {q.choices.map((c: string, i: number) => (
-                        <div key={i} className="flex gap-3 items-center">
-                            <input type="checkbox" checked={q.correct.includes(i)} onChange={()=>toggleCorrect(i)} className="w-5 h-5 accent-police-600" />
-                            <input value={c} onChange={e=> {
-                                const newChoices = [...q.choices];
-                                newChoices[i] = e.target.value;
-                                setQ({...q, choices: newChoices});
-                            }} className="flex-1 p-2 border rounded-lg bg-transparent dark:border-slate-600" placeholder={`Antwort ${String.fromCharCode(65+i)}`} required />
-                        </div>
-                    ))}
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4 mt-2">
-                    <div>
-                        <label className="block text-sm font-bold mb-1">Tags (Komma getrennt)</label>
-                        <input value={q.tags.join(', ')} onChange={e=>setQ({...q, tags: e.target.value.split(',').map((t:string)=>t.trim()).filter(Boolean)})} className="w-full p-2 border rounded-lg bg-transparent dark:border-slate-600" />
-                    </div>
-                    <div>
-                        <label className="block text-sm font-bold mb-1">Rechtsgrundlage</label>
-                        <input value={q.law_ref} onChange={e=>setQ({...q, law_ref: e.target.value})} className="w-full p-2 border rounded-lg bg-transparent dark:border-slate-600" />
-                    </div>
-                    <div>
-                         <label className="block text-sm font-bold mb-1">Schwierigkeit (1-5)</label>
-                         <input type="number" min="1" max="5" value={q.difficulty} onChange={e=>setQ({...q, difficulty: parseInt(e.target.value)})} className="w-full p-2 border rounded-lg bg-transparent dark:border-slate-600" />
-                    </div>
-                </div>
-
-                <div>
-                    <label className="block text-sm font-bold mb-1">Erklärung</label>
-                    <textarea value={q.explain} onChange={e=>setQ({...q, explain: e.target.value})} className="w-full p-3 border rounded-lg bg-transparent dark:border-slate-600" rows={3} />
-                </div>
-
-                <div className="flex justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
-                    <button type="button" onClick={onCancel} className="px-4 py-2 text-slate-500 hover:text-slate-700 font-bold">Abbrechen</button>
-                    <button type="submit" className="px-6 py-2 bg-police-600 text-white rounded-lg font-bold shadow hover:bg-police-700">Speichern</button>
-                </div>
-            </form>
-        </div>
-    );
-};

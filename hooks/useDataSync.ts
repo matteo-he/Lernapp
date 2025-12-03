@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Question, User, UserProgress } from '../types';
-import { dbInstance, collection, doc, writeBatch, onSnapshot, setDoc, ensureAuth } from '../services/firebase';
+import { Question, User, UserProgress } from '../types.ts';
+import { dbInstance, collection, doc, writeBatch, onSnapshot, setDoc, ensureAuth } from '../services/firebase.ts';
 
 // --- Utility Helpers ---
 const FIRESTORE_QUESTIONS = "questions";

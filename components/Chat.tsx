@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { GoogleGenAI } from "@google/genai";
-import { ChatMessage } from '../types';
-import { Card } from './Card';
+import { ChatMessage } from '../types.ts';
+import { Card } from './Card.tsx';
 
 const SYSTEM_INSTRUCTION = `
 Du bist ein erfahrener Ausbildner und KI-Tutor für die österreichische Polizei (E1/E2a Auswahlprüfung und Grundausbildung).
