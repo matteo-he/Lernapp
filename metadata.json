@@ -1,4 +1,5 @@
 {
-  "name": "Polizei Lerntool Pro",
-  "description": "Modernes Lerntool für E1/E2a mit Firebase-Sync, Gamification-Elementen und Spaced Repetition Algorithmus."
+  "name": "Police Learning Tool E1/E2a",
+  "description": "A modern, responsive learning platform for Austrian police service examinations featuring spaced repetition, progress tracking, and cloud synchronization.",
+  "requestFramePermissions": []
 }
