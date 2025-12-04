@@ -17,16 +17,23 @@ let db: Firestore | null = null;
 let auth: Auth | null = null;
 
 try {
-  app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-  auth = getAuth(app);
-  
-  if (auth) {
-    // Auto sign-in anonymously for Firestore access rules
-    signInAnonymously(auth).catch(err => console.error("Anon Auth Failed", err));
+  // Only initialize if config looks somewhat valid to prevent immediate crashes
+  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    
+    if (auth) {
+      // Auto sign-in anonymously for Firestore access rules
+      signInAnonymously(auth).catch(err => console.warn("Anon Auth Failed", err));
+    }
+  } else {
+    console.warn("Firebase config missing. Running in local mode.");
   }
 } catch (e) {
   console.warn("Firebase failed to initialize. Falling back to local mode.", e);
+  db = null;
+  auth = null;
 }
 
 export { db, auth };

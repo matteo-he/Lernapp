@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+ * This file is required to prevent 404 errors in the browser.
+ * While Tailwind is currently loaded via CDN for rapid prototyping,
+ * standard directives are included here for future build compatibility.
+ */
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
