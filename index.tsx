@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
 
 interface ErrorBoundaryProps {
-  children?: ReactNode;
+  children: ReactNode;
 }
 
 interface ErrorBoundaryState {
@@ -11,14 +11,13 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Simple Error Boundary to catch crashes and display a fallback UI
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState;
-
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
+
+  state: ErrorBoundaryState = { hasError: false, error: null };
 
   static getDerivedStateFromError(error: any) {
     return { hasError: true, error };
@@ -43,7 +42,6 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         </div>
       );
     }
-
     return this.props.children;
   }
 }
