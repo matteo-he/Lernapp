@@ -2,7 +2,7 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Polizei Lerntool Pro</title>
     
     <!-- Tailwind CSS -->
@@ -55,7 +55,7 @@
     <!-- Confetti Lib -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-    <!-- Import Map: Clean React 18 Setup -->
+    <!-- Import Map: Consistent React 18 Setup -->
     <script type="importmap">
 {
   "imports": {
@@ -67,7 +67,10 @@
   }
 }
 </script>
-
+    
+    <!-- Babel for in-browser compilation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
     <style>
       body { 
         font-family: 'Inter', sans-serif; 
@@ -107,12 +110,20 @@
   </head>
   <body class="bg-animated min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300">
     <div id="root"></div>
-    <script type="module" src="./index.tsx"></script>
+    
+    <!-- Entry Point: Handled by Babel -->
+    <script type="text/babel" data-type="module" src="./index.tsx" data-presets="react,typescript"></script>
+
+    <!-- Error Handler -->
     <script>
       window.onerror = function(message, source, lineno, colno, error) {
+        // Suppress benign resize observer errors
+        if(message === 'ResizeObserver loop limit exceeded') return;
+
         console.error("Global Error Caught:", message, error);
-        if (document.getElementById('root').innerHTML === "") {
-             document.getElementById('root').innerHTML = '<div style="padding:20px;text-align:center;font-family:sans-serif;margin-top:50px;"><h1>Ladefehler</h1><p>Die Anwendung konnte nicht initialisiert werden.</p><pre style="text-align:left;background:#f0f0f0;padding:10px;border-radius:5px;overflow:auto;max-width:800px;margin:20px auto;">' + (error ? error.toString() : message) + '</pre><button onclick="window.location.reload()" style="padding:10px 20px;margin-top:10px;cursor:pointer;">Neu laden</button></div>';
+        const root = document.getElementById('root');
+        if (root && root.innerHTML.trim() === "") {
+             root.innerHTML = '<div style="padding:20px;text-align:center;font-family:sans-serif;margin-top:50px;"><h1>Ladefehler</h1><p>Die Anwendung konnte nicht initialisiert werden.</p><pre style="text-align:left;background:#f0f0f0;padding:10px;border-radius:5px;overflow:auto;max-width:800px;margin:20px auto;">' + (error ? error.toString() : message) + '</pre><button onclick="window.location.reload()" style="padding:10px 20px;margin-top:10px;cursor:pointer;">Neu laden</button></div>';
         }
       };
     </script>
