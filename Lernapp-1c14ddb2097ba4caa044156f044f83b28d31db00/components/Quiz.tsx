@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
-import { Question, GROUPS } from '../types.ts';
-import { Card } from './Card.tsx';
+import { Question, GROUPS } from '../types';
+import { Card } from './Card';
 
 interface QuizProps {
   question: Question | null;

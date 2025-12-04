@@ -1,5 +1,4 @@
 {
   "name": "Polizei Lerntool Pro",
-  "description": "Modernes Lerntool für E1/E2a mit Firebase-Sync, Gamification-Elementen und Spaced Repetition Algorithmus.",
-  "requestFramePermissions": []
+  "description": "Modernes Lerntool für E1/E2a mit Firebase-Sync, Gamification-Elementen und Spaced Repetition Algorithmus."
 }

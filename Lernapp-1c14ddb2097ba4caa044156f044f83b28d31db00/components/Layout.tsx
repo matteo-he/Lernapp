@@ -1,5 +1,5 @@
 import React from 'react';
-import { User } from '../types.ts';
+import { User } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -54,6 +54,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
         <nav className="space-y-2 flex-1">
           <NavItem id="dashboard" label="Dashboard" icon="📊" />
           <NavItem id="train" label="Training" icon="🎯" />
+          <NavItem id="chat" label="KI-Tutor" icon="💬" />
           {user.role === 'admin' && <NavItem id="admin" label="Verwaltung" icon="⚡" />}
         </nav>
 
@@ -79,6 +80,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, curren
         <div className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-white/20 dark:border-slate-700 p-2 flex justify-around shadow-2xl rounded-2xl">
           <button onClick={() => setView('dashboard')} className={`p-3 rounded-xl transition-all ${currentView === 'dashboard' ? 'text-police-600 bg-police-50 dark:bg-police-900/20 scale-110' : 'text-slate-400'}`}>📊</button>
           <button onClick={() => setView('train')} className={`p-3 rounded-xl transition-all ${currentView === 'train' ? 'text-police-600 bg-police-50 dark:bg-police-900/20 scale-110' : 'text-slate-400'}`}>🎯</button>
+          <button onClick={() => setView('chat')} className={`p-3 rounded-xl transition-all ${currentView === 'chat' ? 'text-police-600 bg-police-50 dark:bg-police-900/20 scale-110' : 'text-slate-400'}`}>💬</button>
           {user.role === 'admin' && <button onClick={() => setView('admin')} className={`p-3 rounded-xl transition-all ${currentView === 'admin' ? 'text-police-600 bg-police-50 dark:bg-police-900/20 scale-110' : 'text-slate-400'}`}>⚡</button>}
           <button onClick={onLogout} className="p-3 rounded-xl text-rose-500">🚪</button>
         </div>

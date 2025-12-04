@@ -1,3 +1,4 @@
+
 export interface Question {
   id: string;
   question: string;
@@ -34,6 +35,13 @@ export interface FilterState {
   difficulty: number;
   bookmarkOnly: boolean;
   searchQuery: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'model';
+  text: string;
+  timestamp: number;
 }
 
 export interface AppStats {
