@@ -20,8 +20,11 @@ try {
   app = initializeApp(firebaseConfig);
   db = getFirestore(app);
   auth = getAuth(app);
-  // Auto sign-in anonymously for Firestore access rules
-  signInAnonymously(auth).catch(err => console.error("Anon Auth Failed", err));
+  
+  if (auth) {
+    // Auto sign-in anonymously for Firestore access rules
+    signInAnonymously(auth).catch(err => console.error("Anon Auth Failed", err));
+  }
 } catch (e) {
   console.warn("Firebase failed to initialize. Falling back to local mode.", e);
 }
