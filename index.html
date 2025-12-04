@@ -2,7 +2,7 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Polizei Lerntool Pro</title>
     
     <!-- Tailwind CSS -->
@@ -55,13 +55,13 @@
     <!-- Confetti Lib -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-    <!-- Import Map: Consistent React 18 Setup -->
+    <!-- Import Map: Explicitly React 18 -->
     <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client?deps=react@18.2.0",
-    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime?deps=react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
     "react/": "https://aistudiocdn.com/react@^19.2.1/"
   }
@@ -76,7 +76,9 @@
         font-family: 'Inter', sans-serif; 
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
+        overscroll-behavior-y: none;
       }
+      /* Custom Scrollbar */
       ::-webkit-scrollbar { width: 6px; height: 6px; }
       ::-webkit-scrollbar-track { background: transparent; }
       ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -108,24 +110,10 @@
       }
     </style>
   </head>
-  <body class="bg-animated min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300">
+  <body class="bg-animated min-h-screen text-slate-900 dark:text-slate-100 transition-colors duration-300 selection:bg-police-200 selection:text-police-900">
     <div id="root"></div>
     
-    <!-- Entry Point: Handled by Babel -->
+    <!-- MAIN APPLICATION ENTRY POINT -->
     <script type="text/babel" data-type="module" src="./index.tsx" data-presets="react,typescript"></script>
-
-    <!-- Error Handler -->
-    <script>
-      window.onerror = function(message, source, lineno, colno, error) {
-        // Suppress benign resize observer errors
-        if(message === 'ResizeObserver loop limit exceeded') return;
-
-        console.error("Global Error Caught:", message, error);
-        const root = document.getElementById('root');
-        if (root && root.innerHTML.trim() === "") {
-             root.innerHTML = '<div style="padding:20px;text-align:center;font-family:sans-serif;margin-top:50px;"><h1>Ladefehler</h1><p>Die Anwendung konnte nicht initialisiert werden.</p><pre style="text-align:left;background:#f0f0f0;padding:10px;border-radius:5px;overflow:auto;max-width:800px;margin:20px auto;">' + (error ? error.toString() : message) + '</pre><button onclick="window.location.reload()" style="padding:10px 20px;margin-top:10px;cursor:pointer;">Neu laden</button></div>';
-        }
-      };
-    </script>
   </body>
 </html>
