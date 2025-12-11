@@ -1,17 +1,38 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { initializeApp } from "firebase/app";
-import { getFirestore, collection, doc, writeBatch, onSnapshot, setDoc, Firestore } from "firebase/firestore";
-import { getAuth, signInAnonymously, Auth } from "firebase/auth";
 import { 
   Shield, LayoutDashboard, BrainCircuit, Settings, LogOut, Sun, Moon, Sparkles, 
   ChevronRight, GraduationCap, Award, Flame, Target, BookOpen, TrendingUp, 
   CheckCircle2, XCircle, ArrowRight, HelpCircle 
 } from 'lucide-react';
 
-// ==========================================
-// 1. TYPES
-// ==========================================
+// --- FIREBASE SETUP (Safe Mode) ---
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, doc, writeBatch, onSnapshot, setDoc } from "firebase/firestore";
+import { getAuth, signInAnonymously } from "firebase/auth";
 
+// Config - Hardcoded here to ensure it exists
+const firebaseConfig = {
+  apiKey: "AIzaSyDLH5c69JKeFWcJyBpzRUfv720KjnnRIU8",
+  authDomain: "e1-und-e2a-lerntool.firebaseapp.com",
+  projectId: "e1-und-e2a-lerntool",
+  storageBucket: "e1-und-e2a-lerntool.firebasestorage.app",
+  messagingSenderId: "28649721297",
+  appId: "1:28649721297:web:432abbe98e34dd50fc24f0"
+};
+
+// Initialize safely
+let db: any = null;
+let auth: any = null;
+try {
+  const app = initializeApp(firebaseConfig);
+  db = getFirestore(app);
+  auth = getAuth(app);
+  signInAnonymously(auth).catch(e => console.warn("Auth warning:", e));
+} catch (e) {
+  console.warn("Offline Mode: Firebase could not initialize", e);
+}
+
+// --- TYPES ---
 interface Question {
   id: string;
   question: string;
@@ -39,43 +60,26 @@ interface UserProgress {
   correctIds: Record<string, number>;
 }
 
-interface FilterState {
-  tags: string[];
-  difficulty: number;
-}
+// --- DATA & CONSTANTS ---
+const DEFAULT_QUESTIONS: Question[] = [
+  { id: "bdg-43-ma-1", question:"§ 43 BDG: Wie hat ein Beamter seine dienstlichen Aufgaben zu erfüllen? Wählen Sie alle zutreffenden.", choices:["Unter Beachtung der geltenden Rechtsordnung.","Treu, gewissenhaft, engagiert und unparteiisch.","Nur nach ständiger Rücksprache mit dem unmittelbaren Vorgesetzten.","So, dass das Vertrauen der Allgemeinheit erhalten bleibt.","Primär an interne Dienstanweisungen, nicht an Gesetze, gebunden."], correct:[0,1,3], explain:"§ 43 BDG: Rechtstreue, Gewissenhaftigkeit, Engagement, Unparteilichkeit und Wahrung des Vertrauens der Allgemeinheit.", law_ref:"BDG § 43", tags:["BDG"], last_checked:"2025-11-11", difficulty:1 },
+  { id:"bdg-44-ma-1", question:"§ 44 BDG (Weisungen): In welchen Fällen ist zu remonstrieren/abzulehnen? Wählen Sie alle zutreffenden.", choices:["Wenn die Weisung von einem unzuständigen Organ erteilt wurde.","Wenn die Befolgung gegen verwaltungsrechtliche Vorschriften verstoßen würde.","Wenn die Befolgung gegen strafrechtliche Vorschriften verstoßen würde.","Wenn der Inhalt unklar ist und trotz Nachfrage unklar bleibt.","Wenn die Weisung mündlich erteilt wurde."], correct:[0,1,2,3], explain:"Unzuständigkeit oder Rechtswidrigkeit → Remonstrationspflicht; Mündlichkeit allein macht eine Weisung nicht unbeachtlich.", law_ref:"BDG § 44", tags:["BDG"], last_checked:"2025-11-11", difficulty:2 },
+  { id:"bdg-43a-ma-1", question:"§ 43a BDG (achtungsvoller Umgang): Welche Aussagen treffen zu? Wählen Sie alle zutreffenden.", choices:["Beamte haben menschenwürdeverletzender Verhalten zu unterlassen.","Vorgesetzte und Mitarbeiter begegnen einander mit Achtung.","Spontane Entgleisungen sind disziplinär immer irrelevant.","Vorgesetzte haben für achtungsvollen Umgang Sorge zu tragen.","§ 43a betrifft nur den Umgang mit Parteien."], correct:[0,1,3], explain:"§ 43a BDG verlangt würdevollen, diskriminierungsfreien Umgang; spontane Entgleisungen können relevant sein.", law_ref:"BDG § 43a", tags:["BDG"], last_checked:"2025-11-11", difficulty:1 },
+  { id:"bdg-39-ma-1", question:"§ 39 BDG (Dienstzuteilung): Unter welchen Bedingungen ist eine Zuteilung ohne schriftliche Zustimmung über 90 Tage zulässig? Wählen Sie alle zutreffenden.", choices:["Wenn der Dienstbetrieb auf andere Weise nicht aufrechterhalten werden kann.","Wenn sie zum Zwecke einer Ausbildung erfolgt.","Wenn wichtige private Gründe vorliegen.","Wenn der Kommandant der entsendenden Dienststelle zustimmt.","Wenn der Kommandant der Zuteilungsdienststelle zustimmt."], correct:[0,1], explain:">90 Tage ohne Zustimmung: nur zur Aufrechterhaltung des Dienstbetriebs oder zu Ausbildungszwecken.", law_ref:"BDG § 39", tags:["BDG"], last_checked:"2025-11-11", difficulty:2 },
+];
 
-interface StatsGroup {
-  key: string;
-  title: string;
-  total: number;
-  attempted: number;
-  correct: number;
-  color: {
-    bg: string;
-    border: string;
-    text: string;
-    bar: string;
-  };
-}
-
-type ViewMode = 'dashboard' | 'train' | 'admin';
-
-// ==========================================
-// 2. CONSTANTS & HELPERS
-// ==========================================
-
-const COLOR_PALETTE = {
+const COLOR_PALETTE: any = {
   BDG:   { bg:"bg-amber-50 dark:bg-amber-900/20", border:"border-amber-400", bar:"bg-amber-400", text:"text-amber-700 dark:text-amber-200" },
   SPG:   { bg:"bg-blue-50 dark:bg-blue-900/20",   border:"border-blue-500",   bar:"bg-blue-500",   text:"text-blue-700 dark:text-blue-200" },
   StPO:  { bg:"bg-rose-50 dark:bg-rose-900/20",    border:"border-rose-500",    bar:"bg-rose-500",    text:"text-rose-700 dark:text-rose-200" },
   ADMIN: { bg:"bg-emerald-50 dark:bg-emerald-900/20",  border:"border-emerald-500",  bar:"bg-emerald-500",  text:"text-emerald-700 dark:text-emerald-200" },
 };
 
-const GROUPS: Omit<StatsGroup, 'total'|'attempted'|'correct'>[] = [
-  { key:"BDG",   title:"Dienstrecht (BDG)",           color:COLOR_PALETTE.BDG },
-  { key:"SPG",   title:"Sicherheitspolizei (SPG)",     color:COLOR_PALETTE.SPG },
-  { key:"STPO",  title:"Strafprozess/StGB",            color:COLOR_PALETTE.StPO },
-  { key:"ADMIN", title:"Verwaltung & Verkehr",          color:COLOR_PALETTE.ADMIN },
+const GROUPS = [
+  { key:"BDG",   title:"Dienstrecht (BDG)" },
+  { key:"SPG",   title:"Sicherheitspolizei (SPG)" },
+  { key:"STPO",  title:"Strafprozess/StGB" },
+  { key:"ADMIN", title:"Verwaltung & Verkehr" },
 ];
 
 const GROUP_TAGS: Record<string, string[]> = {
@@ -85,47 +89,7 @@ const GROUP_TAGS: Record<string, string[]> = {
   ADMIN: ["AVG", "VStG", "WaffG", "StVO", "KFG", "FSG"]
 };
 
-const DEFAULT_QUESTIONS: Question[] = [
-  { id: "bdg-43-ma-1", question:"§ 43 BDG: Wie hat ein Beamter seine dienstlichen Aufgaben zu erfüllen? Wählen Sie alle zutreffenden.", choices:["Unter Beachtung der geltenden Rechtsordnung.","Treu, gewissenhaft, engagiert und unparteiisch.","Nur nach ständiger Rücksprache mit dem unmittelbaren Vorgesetzten.","So, dass das Vertrauen der Allgemeinheit erhalten bleibt.","Primär an interne Dienstanweisungen, nicht an Gesetze, gebunden."], correct:[0,1,3], explain:"§ 43 BDG: Rechtstreue, Gewissenhaftigkeit, Engagement, Unparteilichkeit und Wahrung des Vertrauens der Allgemeinheit.", law_ref:"BDG § 43", tags:["BDG"], last_checked:"2025-11-11", difficulty:1 },
-  { id:"bdg-44-ma-1", question:"§ 44 BDG (Weisungen): In welchen Fällen ist zu remonstrieren/abzulehnen? Wählen Sie alle zutreffenden.", choices:["Wenn die Weisung von einem unzuständigen Organ erteilt wurde.","Wenn die Befolgung gegen verwaltungsrechtliche Vorschriften verstoßen würde.","Wenn die Befolgung gegen strafrechtliche Vorschriften verstoßen würde.","Wenn der Inhalt unklar ist und trotz Nachfrage unklar bleibt.","Wenn die Weisung mündlich erteilt wurde."], correct:[0,1,2,3], explain:"Unzuständigkeit oder Rechtswidrigkeit → Remonstrationspflicht; Mündlichkeit allein macht eine Weisung nicht unbeachtlich.", law_ref:"BDG § 44", tags:["BDG"], last_checked:"2025-11-11", difficulty:2 },
-  { id:"bdg-43a-ma-1", question:"§ 43a BDG (achtungsvoller Umgang): Welche Aussagen treffen zu? Wählen Sie alle zutreffenden.", choices:["Beamte haben menschenwürdeverletzender Verhalten zu unterlassen.","Vorgesetzte und Mitarbeiter begegnen einander mit Achtung.","Spontane Entgleisungen sind disziplinär immer irrelevant.","Vorgesetzte haben für achtungsvollen Umgang Sorge zu tragen.","§ 43a betrifft nur den Umgang mit Parteien."], correct:[0,1,3], explain:"§ 43a BDG verlangt würdevollen, diskriminierungsfreien Umgang; spontane Entgleisungen können relevant sein.", law_ref:"BDG § 43a", tags:["BDG"], last_checked:"2025-11-11", difficulty:1 },
-  { id:"bdg-39-ma-1", question:"§ 39 BDG (Dienstzuteilung): Unter welchen Bedingungen ist eine Zuteilung ohne schriftliche Zustimmung über 90 Tage zulässig? Wählen Sie alle zutreffenden.", choices:["Wenn der Dienstbetrieb auf andere Weise nicht aufrechterhalten werden kann.","Wenn sie zum Zwecke einer Ausbildung erfolgt.","Wenn wichtige private Gründe vorliegen.","Wenn der Kommandant der entsendenden Dienststelle zustimmt.","Wenn der Kommandant der Zuteilungsdienststelle zustimmt."], correct:[0,1], explain:">90 Tage ohne Zustimmung: nur zur Aufrechterhaltung des Dienstbetriebs oder zu Ausbildungszwecken.", law_ref:"BDG § 39", tags:["BDG"], last_checked:"2025-11-11", difficulty:2 },
-];
-
-// RNG Helpers
-function xmur3(str: string) {
-  let h = 1779033703 ^ str.length;
-  for(let i=0;i<str.length;i++){
-    h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
-    h = h << 13 | h >>> 19;
-  }
-  return function(){
-    h = Math.imul(h ^ h >>> 16, 2246822507);
-    h = Math.imul(h ^ h >>> 13, 3266489909);
-    return (h ^ h >>> 16) >>> 0;
-  };
-}
-
-function mulberry32(a: number) {
-  return function(){
-    let t = a += 0x6D2B79F5;
-    t = Math.imul(t ^ t >>> 15, t | 1);
-    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-    return ((t ^ t >>> 14) >>> 0) / 4294967296;
-  };
-}
-
-function seededShuffle<T>(array: T[], seedStr: string): T[] {
-  const seed = xmur3(seedStr)();
-  const rng = mulberry32(seed);
-  const a = [...array];
-  for(let i=a.length-1;i>0;i--){
-    const j = Math.floor(rng()*(i+1));
-    [a[i],a[j]] = [a[j],a[i]];
-  }
-  return a;
-}
-
+// --- HELPER FUNCTIONS ---
 function hashPassword(str: string): string {
   let hash = 0;
   for(let i=0;i<str.length;i++){
@@ -135,952 +99,487 @@ function hashPassword(str: string): string {
   return `h${Math.abs(hash)}`;
 }
 
-function generateId(prefix="id"): string {
-  const cleanPrefix = prefix.replace(/[^a-z0-9]+/gi, "").toLowerCase() || "id";
-  return `${cleanPrefix}-${Math.random().toString(36).slice(2,8)}-${Date.now().toString(36)}`;
-}
-
-// ==========================================
-// 3. FIREBASE SERVICE
-// ==========================================
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDLH5c69JKeFWcJyBpzRUfv720KjnnRIU8",
-  authDomain: "e1-und-e2a-lerntool.firebaseapp.com",
-  projectId: "e1-und-e2a-lerntool",
-  storageBucket: "e1-und-e2a-lerntool.firebasestorage.app",
-  messagingSenderId: "28649721297",
-  appId: "1:28649721297:web:432abbe98e34dd50fc24f0"
-};
-
-let app;
-let db: Firestore | null = null;
-let auth: Auth | null = null;
-
-try {
-  if (firebaseConfig.apiKey && firebaseConfig.projectId) {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-    auth = getAuth(app);
-    if (auth) {
-      signInAnonymously(auth).catch(err => console.warn("Anon Auth Failed", err));
-    }
-  } else {
-    console.warn("Firebase config missing. Running in local mode.");
+function seededShuffle<T>(array: T[], seedStr: string): T[] {
+  let h = 1779033703 ^ seedStr.length;
+  for(let i=0;i<seedStr.length;i++){
+    h = Math.imul(h ^ seedStr.charCodeAt(i), 3432918353);
+    h = h << 13 | h >>> 19;
   }
-} catch (e) {
-  console.warn("Firebase failed to initialize. Falling back to local mode.", e);
-  db = null;
-  auth = null;
-}
-
-const FIRESTORE_COLLECTIONS = {
-  QUESTIONS: "questions",
-  USERS: "users",
-  PROGRESS: "userProgress"
-};
-
-const syncUserProgress = async (userId: string, data: any) => {
-  if (!db || !userId) return;
-  try {
-    const ref = doc(db, FIRESTORE_COLLECTIONS.PROGRESS, userId);
-    await setDoc(ref, { [userId + ':metrics']: data }, { merge: true });
-  } catch (e) {
-    console.error("Failed to sync progress", e);
-  }
-};
-
-const syncUserList = async (users: User[]) => {
-  if (!db) return;
-  try {
-    const batch = writeBatch(db);
-    users.forEach(u => {
-      const ref = doc(db!, FIRESTORE_COLLECTIONS.USERS, u.id);
-      batch.set(ref, u);
-    });
-    await batch.commit();
-  } catch (e) {
-    console.error("User sync failed", e);
-  }
-};
-
-// ==========================================
-// 4. COMPONENTS
-// ==========================================
-
-// --- Component: QuestionCard ---
-interface QuestionCardProps {
-  question: Question;
-  idx: number;
-  submitted: boolean;
-  onSubmit: (selectedIndices: number[]) => void;
-  onNext: () => void;
-  tier: number;
-}
-
-const QuestionCard: React.FC<QuestionCardProps> = ({ 
-  question: q, idx, submitted, onSubmit, onNext, tier 
-}) => {
-  const [selectedDisplayIndices, setSelectedDisplayIndices] = useState<number[]>([]);
-
-  // Stable shuffle for choices
-  const displayOrder = useMemo(() => {
-    return seededShuffle([0, 1, 2, 3, 4], `${q.id}#${idx}`);
-  }, [q.id, idx]);
-
-  const groupKey = Object.keys(GROUP_TAGS).find(key => 
-    q.tags.some(t => GROUP_TAGS[key].includes(t))
-  ) || "ADMIN";
+  let seed = function(){
+    h = Math.imul(h ^ h >>> 16, 2246822507);
+    h = Math.imul(h ^ h >>> 13, 3266489909);
+    return (h ^ h >>> 16) >>> 0;
+  }();
   
-  const styles = (COLOR_PALETTE as any)[groupKey] || COLOR_PALETTE.ADMIN;
-
-  const toggleSelection = (displayIndex: number) => {
-    if (submitted) return;
-    setSelectedDisplayIndices(prev => 
-      prev.includes(displayIndex) 
-        ? prev.filter(i => i !== displayIndex) 
-        : [...prev, displayIndex]
-    );
+  const rng = function(){
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
   };
 
-  const handleSubmit = () => {
-    if (selectedDisplayIndices.length === 0) return;
-    onSubmit(selectedDisplayIndices);
-  };
-
-  return (
-    <div className="w-full animate-slide-up">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl shadow-slate-200/50 dark:shadow-none overflow-hidden border border-slate-100 dark:border-slate-800">
-        
-        {/* Progress Bar Top */}
-        <div className={`h-1.5 w-full bg-slate-100 dark:bg-slate-800`}>
-             <div className={`h-full ${styles.bar} transition-all duration-1000`} style={{width: '100%'}}></div>
-        </div>
-        
-        <div className="p-6 md:p-10">
-          {/* Header / Meta */}
-          <div className="flex flex-wrap items-center gap-3 mb-6">
-            <span className={`px-3 py-1 rounded-full text-xs font-bold border ${styles.bg} ${styles.border} ${styles.text} uppercase tracking-wide`}>
-              {q.tags[0] || "Allgemein"}
-            </span>
-            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700">
-               {[...Array(5)].map((_, i) => (
-                 <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < q.difficulty ? 'bg-slate-400 dark:bg-slate-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
-               ))}
-            </div>
-            <span className="text-xs font-medium text-slate-400 ml-auto">ID: {q.id}</span>
-          </div>
-
-          {/* Question */}
-          <h2 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white mb-8 leading-snug">
-            {q.question}
-          </h2>
-
-          {/* Choices Grid */}
-          <div className="grid gap-3">
-            {displayOrder.map((originalIndex, displayIndex) => {
-              const isSelected = selectedDisplayIndices.includes(displayIndex);
-              const isCorrect = q.correct.includes(originalIndex);
-              
-              let cardClass = "relative flex items-center gap-4 p-4 md:p-5 rounded-2xl border-2 transition-all duration-200 cursor-pointer group ";
-              
-              if (submitted) {
-                if (isCorrect) {
-                  cardClass += "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/10 dark:border-emerald-500/50 z-10 scale-[1.01]";
-                } else if (isSelected && !isCorrect) {
-                  cardClass += "border-red-500 bg-red-50 dark:bg-red-900/10 dark:border-red-500/50 opacity-80";
-                } else {
-                  cardClass += "border-slate-100 dark:border-slate-800 opacity-50 grayscale";
-                }
-              } else {
-                if (isSelected) {
-                  cardClass += "border-blue-500 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-500 shadow-md ring-1 ring-blue-200 dark:ring-blue-900";
-                } else {
-                  cardClass += "border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800/50";
-                }
-              }
-
-              return (
-                <div 
-                  key={displayIndex} 
-                  onClick={() => toggleSelection(displayIndex)}
-                  className={cardClass}
-                >
-                  <div className={`flex-shrink-0 w-8 h-8 rounded-full border-2 flex items-center justify-center transition-all duration-300
-                    ${submitted && isCorrect ? 'border-emerald-500 bg-emerald-500 text-white scale-110' : 
-                      submitted && isSelected && !isCorrect ? 'border-red-500 bg-red-500 text-white scale-110' :
-                      isSelected ? 'border-blue-500 bg-blue-500 text-white' : 'border-slate-300 dark:border-slate-600 text-slate-400'
-                    }`}
-                  >
-                    {submitted && isCorrect ? <CheckCircle2 size={18} /> : 
-                     submitted && isSelected && !isCorrect ? <XCircle size={18} /> :
-                     <span className="text-sm font-bold">{String.fromCharCode(65 + displayIndex)}</span>}
-                  </div>
-                  <div className="flex-1">
-                    <span className={`text-base md:text-lg leading-relaxed ${submitted && isCorrect ? 'font-semibold text-emerald-900 dark:text-emerald-100' : 'text-slate-700 dark:text-slate-200'}`}>
-                      {q.choices[originalIndex]}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Footer Actions */}
-          <div className="mt-10 pt-6 border-t border-slate-100 dark:border-slate-800">
-            {!submitted ? (
-              <div className="flex justify-between items-center animate-fade-in">
-                <button 
-                  onClick={onNext}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-sm font-medium px-4 py-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-                >
-                  Überspringen
-                </button>
-                <button 
-                  onClick={handleSubmit}
-                  disabled={selectedDisplayIndices.length === 0}
-                  className={`flex items-center gap-2 px-8 py-3.5 rounded-xl font-bold shadow-xl transition-all transform active:scale-[0.98] 
-                    ${selectedDisplayIndices.length > 0 
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/30 ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-slate-900' 
-                      : 'bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed shadow-none'}`}
-                >
-                  Antwort prüfen
-                  <ArrowRight size={20} />
-                </button>
-              </div>
-            ) : (
-              <div className="animate-slide-up">
-                <div className="bg-amber-50 dark:bg-amber-900/10 rounded-2xl p-6 border border-amber-100 dark:border-amber-900/30 mb-6">
-                  <div className="flex items-start gap-4">
-                    <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg text-amber-600 dark:text-amber-400">
-                       <BookOpen size={24} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-slate-900 dark:text-white mb-2 text-lg">Erklärung</h4>
-                      <p className="text-slate-700 dark:text-slate-300 leading-relaxed mb-4">
-                        {q.explain}
-                      </p>
-                      <div className="flex items-center gap-2 text-xs font-mono text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/20 px-3 py-1.5 rounded-md inline-block">
-                        <span className="font-bold">§</span> {q.law_ref}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <button 
-                    onClick={onNext}
-                    className="flex items-center gap-2 px-8 py-3.5 rounded-xl font-bold bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-500/30 transition-all transform active:scale-[0.98] hover:pr-6"
-                  >
-                    Nächste Frage
-                    <ArrowRight size={20} />
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Component: Dashboard ---
-interface DashboardProps {
-  stats: StatsGroup[];
-  rank: string;
-  score: number;
-  streak: number;
-  progress: UserProgress;
+  const a = [...array];
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(rng()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ stats, rank, score, streak, progress }) => {
-  const totalQuestions = stats.reduce((acc, s) => acc + s.total, 0);
-  const totalAttempted = stats.reduce((acc, s) => acc + s.attempted, 0);
-  const totalCorrect = stats.reduce((acc, s) => acc + s.correct, 0);
-  const overallAccuracy = totalAttempted > 0 ? Math.round((totalCorrect / totalAttempted) * 100) : 0;
+// --- COMPONENTS ---
 
-  const colorMap = ['bg-amber-400', 'bg-blue-500', 'bg-rose-500', 'bg-emerald-500'];
-
-  const StatCard = ({ icon: Icon, label, value, sub, gradient, textColor }: any) => (
-    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:shadow-md transition-shadow">
-      <div className="relative z-10 flex flex-col h-full justify-between">
-        <div className="flex justify-between items-start mb-4">
-           <div className={`p-3 rounded-2xl bg-gradient-to-br ${gradient} text-white shadow-lg`}>
-              <Icon size={24} strokeWidth={2} />
-           </div>
-           {sub && <span className="text-xs font-semibold bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-full text-slate-500">{sub}</span>}
-        </div>
-        <div>
-           <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">{label}</p>
-           <h3 className={`text-3xl font-bold ${textColor || 'text-slate-900 dark:text-white'}`}>{value}</h3>
-        </div>
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="space-y-8 animate-slide-up">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          icon={Award} 
-          label="Rang" 
-          value={rank} 
-          sub={`${score} XP`} 
-          gradient="from-indigo-500 to-purple-600" 
-          textColor="text-indigo-600 dark:text-indigo-400"
-        />
-        <StatCard 
-          icon={Flame} 
-          label="Streak" 
-          value={streak} 
-          sub="Tage" 
-          gradient="from-orange-400 to-red-500" 
-        />
-        <StatCard 
-          icon={Target} 
-          label="Genauigkeit" 
-          value={`${overallAccuracy}%`} 
-          gradient="from-emerald-400 to-teal-500" 
-          textColor="text-emerald-600 dark:text-emerald-400"
-        />
-        <StatCard 
-          icon={BookOpen} 
-          label="Fortschritt" 
-          value={`${Math.round((totalAttempted/Math.max(totalQuestions,1))*100)}%`} 
-          sub={`${totalAttempted}/${totalQuestions}`} 
-          gradient="from-blue-400 to-cyan-500" 
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800">
-          <div className="flex items-center justify-between mb-8">
-             <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-               <TrendingUp className="text-blue-500" size={24} />
-               Fächeranalyse
-             </h3>
-          </div>
-          
-          <div className="grid sm:grid-cols-2 gap-6">
-            {stats.map((stat) => (
-              <div key={stat.key} className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800">
-                <div className="flex justify-between items-start mb-4">
-                  <span className={`font-bold text-sm px-3 py-1 rounded-full border ${stat.color.bg} ${stat.color.border} ${stat.color.text}`}>
-                     {stat.key}
-                  </span>
-                  <span className="text-xs font-mono text-slate-400">{stat.total} Fragen</span>
-                </div>
-                
-                <h4 className="font-semibold text-slate-700 dark:text-slate-300 mb-4 h-10 line-clamp-2">{stat.title}</h4>
-                
-                <div className="space-y-4">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1.5 font-medium text-slate-500">
-                      <span>Gelernt</span>
-                      <span>{Math.round((stat.attempted/Math.max(stat.total,1))*100)}%</span>
-                    </div>
-                    <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div className={`h-full bg-slate-400 dark:bg-slate-600`} style={{ width: `${(stat.attempted/Math.max(stat.total,1))*100}%` }} />
-                    </div>
-                  </div>
-                   <div>
-                    <div className="flex justify-between text-xs mb-1.5 font-medium text-slate-500">
-                      <span>Richtig</span>
-                      <span className={stat.correct/Math.max(stat.attempted,1) > 0.8 ? 'text-emerald-500' : 'text-slate-500'}>
-                        {stat.attempted ? Math.round((stat.correct/stat.attempted)*100) : 0}%
-                      </span>
-                    </div>
-                    <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div className={`h-full ${stat.color.bar}`} style={{ width: `${stat.attempted ? (stat.correct/stat.attempted)*100 : 0}%` }} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 flex flex-col">
-          <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-6">Verteilung</h3>
-          <div className="flex-1 flex flex-col justify-center items-center py-8">
-             <div className="relative w-48 h-48 rounded-full border-8 border-slate-100 dark:border-slate-800 flex items-center justify-center">
-                <div className="text-center">
-                   <span className="block text-4xl font-bold text-slate-900 dark:text-white">{totalAttempted}</span>
-                   <span className="text-xs text-slate-500 uppercase tracking-wide">Beantwortet</span>
-                </div>
-             </div>
-          </div>
-          <div className="mt-6 space-y-4">
-             {stats.map((stat, index) => (
-               <div key={stat.key} className="flex items-center justify-between text-sm group">
-                 <div className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
-                    <div className={`w-3 h-3 rounded-full ${colorMap[index % colorMap.length]}`} />
-                    <span className="font-medium">{stat.key}</span>
-                 </div>
-                 <div className="flex items-center gap-4">
-                    <div className="w-24 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                       <div className={`h-full ${colorMap[index % colorMap.length]}`} style={{ width: `${(stat.attempted / Math.max(totalAttempted, 1)) * 100}%` }}></div>
-                    </div>
-                    <span className="font-semibold text-slate-900 dark:text-white w-8 text-right">{stat.attempted}</span>
-                 </div>
-               </div>
-             ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Component: AdminPanel ---
-const AdminPanel = ({ questions, onDelete, onSave }: any) => {
-  const [json, setJson] = useState("");
+const DashboardStats = ({ stats, score, rank }: any) => {
+  const totalAttempts = stats.reduce((acc: number, s: any) => acc + s.attempted, 0);
+  
   return (
     <div className="space-y-6 animate-slide-up">
-      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-800">
-        <div className="flex justify-between items-center mb-6">
-          <h3 className="text-xl font-bold dark:text-white flex items-center gap-2">
-            <Settings size={20} className="text-blue-500" />
-            Fragen verwalten
-          </h3>
-          <span className="text-sm text-slate-500">{questions.length} Fragen in der Datenbank</span>
+      {/* Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400"><Award size={20} /></div>
+            <span className="text-sm text-slate-500">Rang</span>
+          </div>
+          <div className="text-xl font-bold dark:text-white">{rank}</div>
+          <div className="text-xs text-slate-400 mt-1">{score} XP</div>
         </div>
-        
-        <div className="h-96 overflow-y-auto mb-6 border rounded-xl dark:border-slate-700 bg-slate-50 dark:bg-slate-950/50">
-          {questions.map((q: Question) => (
-             <div key={q.id} className="p-4 border-b dark:border-slate-800 flex justify-between items-center hover:bg-white dark:hover:bg-slate-900 transition-colors">
-                <div className="flex flex-col gap-1 overflow-hidden">
-                   <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs px-2 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400">{q.id}</span>
-                      <div className="flex gap-1">
-                        {q.tags.map(t => <span key={t} className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">{t}</span>)}
-                      </div>
-                   </div>
-                   <span className="truncate text-sm text-slate-700 dark:text-slate-300 font-medium">{q.question}</span>
-                </div>
-                <button onClick={() => onDelete(q.id)} className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 p-2 rounded-lg transition-colors text-xs font-semibold">
-                  Löschen
-                </button>
-             </div>
-          ))}
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg text-blue-600 dark:text-blue-400"><BookOpen size={20} /></div>
+            <span className="text-sm text-slate-500">Fragen</span>
+          </div>
+          <div className="text-xl font-bold dark:text-white">{totalAttempts}</div>
+          <div className="text-xs text-slate-400 mt-1">Beantwortet</div>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div className="flex flex-col gap-2">
-               <label className="text-sm font-medium text-slate-700 dark:text-slate-300">JSON Import / Export</label>
-               <textarea 
-                  className="w-full p-4 border rounded-xl dark:bg-slate-950 dark:border-slate-800 dark:text-slate-200 text-xs font-mono focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                  rows={6}
-                  placeholder='Format: [{"id":"...", "question":"...", ...}]'
-                  value={json}
-                  onChange={e => setJson(e.target.value)}
-               />
-             </div>
-             <div className="flex flex-col gap-3 justify-end">
-                <button 
-                  onClick={() => {
-                    try {
-                        const parsed = JSON.parse(json);
-                        if(Array.isArray(parsed)) parsed.forEach(onSave);
-                        setJson("");
-                        alert(`${parsed.length} Fragen erfolgreich importiert!`);
-                    } catch(e) { alert("Fehlerhaftes JSON Format"); }
-                  }}
-                  className="bg-emerald-600 text-white px-6 py-3 rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 hover:scale-[1.02] transition-all font-medium flex items-center justify-center gap-2"
-                >
-                    <Sparkles size={18} />
-                    JSON Importieren
-                </button>
-                 <button 
-                  onClick={() => {
-                      const blob = new Blob([JSON.stringify(questions, null, 2)], {type: "application/json"});
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a'); a.href = url; a.download = `backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
-                  }}
-                  className="bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg shadow-blue-500/20 hover:bg-blue-700 hover:scale-[1.02] transition-all font-medium"
-                >
-                    Backup Herunterladen
-                </button>
-             </div>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg text-emerald-600 dark:text-emerald-400"><Target size={20} /></div>
+            <span className="text-sm text-slate-500">Schnitt</span>
+          </div>
+          <div className="text-xl font-bold dark:text-white">
+            {totalAttempts > 0 ? Math.round(stats.reduce((acc: number, s: any) => acc + s.correct, 0) / totalAttempts * 100) : 0}%
+          </div>
+          <div className="text-xs text-slate-400 mt-1">Korrektheit</div>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg text-orange-600 dark:text-orange-400"><Flame size={20} /></div>
+            <span className="text-sm text-slate-500">Streak</span>
+          </div>
+          <div className="text-xl font-bold dark:text-white">1</div>
+          <div className="text-xs text-slate-400 mt-1">Tag</div>
         </div>
       </div>
-    </div>
-  )
-}
 
-// ==========================================
-// 5. MAIN APP
-// ==========================================
+      {/* Subject Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {stats.map((stat: any) => {
+          const colors = COLOR_PALETTE[stat.key] || COLOR_PALETTE.ADMIN;
+          const percentage = stat.attempted > 0 ? (stat.correct / stat.attempted) * 100 : 0;
+          
+          return (
+            <div key={stat.key} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800">
+               <div className="flex justify-between items-center mb-3">
+                 <span className={`px-2 py-1 rounded text-xs font-bold border ${colors.bg} ${colors.border} ${colors.text}`}>{stat.key}</span>
+                 <span className="text-xs text-slate-400">{stat.correct}/{stat.attempted} Richtig</span>
+               </div>
+               <h4 className="font-semibold text-slate-700 dark:text-slate-200 mb-3">{stat.title}</h4>
+               <div className="w-full h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                 <div className={`h-full transition-all duration-500 ${colors.bar}`} style={{ width: `${percentage}%` }}></div>
+               </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  );
+};
+
+// --- MAIN APP COMPONENT ---
 
 export default function App() {
-  // Auth State
+  // State
   const [user, setUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
-  
-  // Data State
-  const [questions, setQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<Question[]>(DEFAULT_QUESTIONS);
   const [progress, setProgress] = useState<UserProgress>({
-    totalAttempts: 0,
-    totalCorrect: 0,
-    attemptedIds: {},
-    correctIds: {}
+    totalAttempts: 0, totalCorrect: 0, attemptedIds: {}, correctIds: {}
   });
-
-  // UI State
-  const [view, setView] = useState<ViewMode>('dashboard');
-  const [darkMode, setDarkMode] = useState(false);
+  
+  // Login State
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(true);
-
+  
+  // UI State
+  const [view, setView] = useState<'dashboard' | 'train' | 'admin'>('dashboard');
+  const [darkMode, setDarkMode] = useState(false);
+  
   // Training State
   const [currentQIndex, setCurrentQIndex] = useState(0);
   const [submitted, setSubmitted] = useState(false);
-  const [filter, setFilter] = useState<FilterState>({ tags: [], difficulty: 0 });
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
 
-  // --- Effects ---
-
-  // Dark Mode
+  // Effects
   useEffect(() => {
     if (darkMode) document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [darkMode]);
 
-  // Load Initial Data (Firestore or LocalStorage fallback)
+  // Sync Logic (Simplified)
   useEffect(() => {
-    // Safety timeout to ensure loading screen doesn't get stuck if firebase fails
-    const safetyTimer = setTimeout(() => setLoading(false), 2000);
-
-    // 1. Listen for Users
-    let unsubUsers = () => {};
+    // 1. Load Users
     if (db) {
-      try {
-        unsubUsers = onSnapshot(collection(db, FIRESTORE_COLLECTIONS.USERS), (snap) => {
-          const uList: User[] = [];
-          snap.forEach(d => uList.push(d.data() as User));
-          setUsers(uList.length ? uList : []);
-          setLoading(false);
-        }, (err) => {
-           console.warn("Firestore users error", err);
-           setLoading(false);
-        });
-      } catch (e) { console.error(e); setLoading(false); }
-    } else {
-       const localUsers = localStorage.getItem("users");
-       if(localUsers) setUsers(JSON.parse(localUsers));
-       setLoading(false);
+        try {
+            onSnapshot(collection(db, "users"), (snap) => {
+                const u: User[] = [];
+                snap.forEach(d => u.push(d.data() as User));
+                if(u.length) setUsers(u);
+            });
+        } catch(e) { console.warn("User sync error", e); }
+        
+        // 2. Load Questions
+        try {
+            onSnapshot(collection(db, "questions"), (snap) => {
+                const q: Question[] = [];
+                snap.forEach(d => {
+                   const data = d.data() as Question;
+                   if(!data.__deleted) q.push(data);
+                });
+                if(q.length) setQuestions(q);
+            });
+        } catch(e) { console.warn("Question sync error", e); }
     }
-
-    // 2. Listen for Questions
-    let unsubQuestions = () => {};
-    if (db) {
-      try {
-        unsubQuestions = onSnapshot(collection(db, FIRESTORE_COLLECTIONS.QUESTIONS), (snap) => {
-          const qList: Question[] = [];
-          snap.forEach(d => {
-              const data = d.data() as Question;
-              if(!data.__deleted) qList.push(data);
-          });
-          setQuestions(qList.length ? qList : DEFAULT_QUESTIONS);
-        }, (err) => console.warn("Firestore questions error", err));
-      } catch (e) { console.error(e); }
-    } else {
-        setQuestions(DEFAULT_QUESTIONS);
-    }
-
-    return () => { 
-      unsubUsers(); 
-      unsubQuestions(); 
-      clearTimeout(safetyTimer);
-    };
   }, []);
 
-  // Listen for active user progress
   useEffect(() => {
-    if (!user || !db) return;
-    try {
-      const unsub = onSnapshot(doc(db, FIRESTORE_COLLECTIONS.PROGRESS, user.id), (doc) => {
-        if (doc.exists()) {
-          const data = doc.data();
-          const metrics = data[user.id + ':metrics'];
-          if (metrics) setProgress(metrics);
-        }
-      });
-      return () => unsub();
-    } catch (e) {
-      console.warn("Progress sync failed", e);
+    if(user && db) {
+        try {
+            onSnapshot(doc(db, "userProgress", user.id), (doc) => {
+                if(doc.exists()) {
+                    const data = doc.data();
+                    if(data[user.id + ':metrics']) setProgress(data[user.id + ':metrics']);
+                }
+            });
+        } catch(e) {}
     }
   }, [user]);
 
-  // --- Logic ---
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    const found = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-    if (found && found.passwordHash === hashPassword(password)) {
-      setUser(found);
-    } else if (!found && username.length > 2 && password.length > 3) {
-      // Auto-register for demo purposes if not found
-      const newUser: User = {
-        id: generateId("user"),
-        username,
-        passwordHash: hashPassword(password),
-        role: username.toLowerCase().includes("admin") ? "admin" : "user"
-      };
-      setUsers([...users, newUser]);
-      setUser(newUser);
-      syncUserList([...users, newUser]); // Fire and forget
-    } else {
-      alert("Ungültige Anmeldedaten.");
-    }
-  };
-
+  // Derived State
   const filteredQuestions = useMemo(() => {
-    let q = questions;
-    if (filter.tags.length > 0) {
-      q = q.filter(item => item.tags.some(t => filter.tags.includes(t)));
-    }
-    if (filter.difficulty > 0) {
-      q = q.filter(item => item.difficulty === filter.difficulty);
-    }
-    // Simple shuffle for session
-    return seededShuffle(q, `session-${user?.id}-${new Date().getHours()}`);
-  }, [questions, filter, user]);
+     let q = questions;
+     if (activeTag) {
+        q = q.filter(item => item.tags.some(t => GROUP_TAGS[activeTag]?.includes(t)));
+     }
+     // Stable shuffle for the session
+     return seededShuffle(q, `session-${user?.id || 'guest'}`);
+  }, [questions, activeTag, user]);
 
   const currentQuestion = filteredQuestions[currentQIndex % filteredQuestions.length];
 
-  const handleAnswer = (selectedIndices: number[]) => {
-    if (!currentQuestion || submitted) return;
-    
-    // Re-derive display order to verify answer logic matches visual component
-    const displayOrder = seededShuffle([0, 1, 2, 3, 4], `${currentQuestion.id}#${currentQIndex}`);
-    const selectedOriginals = selectedIndices.map(i => displayOrder[i]);
-    
-    const correctSet = new Set(currentQuestion.correct);
-    const selectedSet = new Set(selectedOriginals);
-    const isCorrect = [0,1,2,3,4].every(i => correctSet.has(i) === selectedSet.has(i));
+  const statsGroups = GROUPS.map(g => {
+    const groupQs = questions.filter(q => q.tags.some(t => GROUP_TAGS[g.key]?.includes(t)));
+    let correct = 0;
+    let attempted = 0;
+    groupQs.forEach(q => {
+        if(progress.attemptedIds[q.id]) {
+            attempted += progress.attemptedIds[q.id];
+            correct += progress.correctIds[q.id] || 0;
+        }
+    });
+    return { ...g, total: groupQs.length, attempted, correct };
+  });
 
-    setSubmitted(true);
-
-    const newProgress = { ...progress };
-    newProgress.totalAttempts++;
-    newProgress.attemptedIds[currentQuestion.id] = (newProgress.attemptedIds[currentQuestion.id] || 0) + 1;
+  // Handlers
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!username || !password) return;
     
-    if (isCorrect) {
-      newProgress.totalCorrect++;
-      newProgress.correctIds[currentQuestion.id] = (newProgress.correctIds[currentQuestion.id] || 0) + 1;
+    const hash = hashPassword(password);
+    const existing = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+    
+    if (existing) {
+        if(existing.passwordHash === hash) setUser(existing);
+        else alert("Falsches Passwort");
+    } else {
+        // Register new user
+        const newUser: User = {
+            id: `u-${Date.now()}`,
+            username,
+            passwordHash: hash,
+            role: username.toLowerCase().includes("admin") ? 'admin' : 'user'
+        };
+        setUser(newUser);
+        // Fire & Forget sync
+        if(db) setDoc(doc(db, "users", newUser.id), newUser).catch(console.error);
     }
+  };
 
-    setProgress(newProgress);
-    syncUserProgress(user!.id, newProgress);
+  const submitAnswer = () => {
+    if(!currentQuestion) return;
+    setSubmitted(true);
+    
+    // Check correctness
+    // Re-shuffle locally to check against original index
+    const displayOrder = seededShuffle([0,1,2,3,4], `${currentQuestion.id}#${currentQIndex}`);
+    const selectedOriginals = selectedAnswers.map(idx => displayOrder[idx]);
+    
+    const isCorrect = 
+        currentQuestion.correct.length === selectedOriginals.length &&
+        currentQuestion.correct.every(c => selectedOriginals.includes(c));
+
+    // Update Progress
+    const newP = { ...progress };
+    newP.totalAttempts++;
+    newP.attemptedIds[currentQuestion.id] = (newP.attemptedIds[currentQuestion.id] || 0) + 1;
+    if(isCorrect) {
+        newP.totalCorrect++;
+        newP.correctIds[currentQuestion.id] = (newP.correctIds[currentQuestion.id] || 0) + 1;
+    }
+    setProgress(newP);
+    
+    // Sync
+    if(db && user) {
+        setDoc(doc(db, "userProgress", user.id), { [user.id + ':metrics']: newP }, { merge: true }).catch(console.error);
+    }
   };
 
   const nextQuestion = () => {
     setSubmitted(false);
-    setCurrentQIndex(prev => prev + 1);
+    setSelectedAnswers([]);
+    setCurrentQIndex(p => p + 1);
   };
 
-  const statsGroups = useMemo(() => {
-    return GROUPS.map(g => {
-        const groupQs = questions.filter(q => q.tags.some(t => GROUP_TAGS[g.key]?.includes(t)));
-        let groupCorrect = 0;
-        groupQs.forEach(q => {
-            const rawCorrect = progress.correctIds[q.id] || 0;
-            if(progress.attemptedIds[q.id] > 0) {
-               groupCorrect += rawCorrect; 
-            }
-        });
-        const totalGroupAttempts = groupQs.reduce((sum, q) => sum + (progress.attemptedIds[q.id] || 0), 0);
-
-        return {
-            ...g,
-            total: groupQs.length,
-            attempted: totalGroupAttempts,
-            correct: groupCorrect
-        };
-    });
-  }, [questions, progress]);
-
-  // Calculate Rank and XP
-  const xp = progress.totalCorrect * 10;
-  const ranks = [
-      { title: "Anwärter:in", min: 0 },
-      { title: "Inspektor:in", min: 150 },
-      { title: "Gruppeninspektor:in", min: 400 },
-      { title: "Revierinspektor:in", min: 800 },
-      { title: "Abt. Inspektor:in", min: 1300 },
-      { title: "Chefinspektor:in", min: 2000 },
-  ];
-  
-  const currentRankIndex = [...ranks].reverse().findIndex(r => xp >= r.min);
-  const actualRankIndex = currentRankIndex === -1 ? 0 : ranks.length - 1 - currentRankIndex;
-  const currentRank = ranks[actualRankIndex];
-  const nextRank = ranks[actualRankIndex + 1];
-  
-  const xpForCurrentRank = currentRank.min;
-  const xpForNextRank = nextRank ? nextRank.min : xp;
-  const progressToNextRank = nextRank 
-    ? Math.min(100, Math.max(0, ((xp - xpForCurrentRank) / (xpForNextRank - xpForCurrentRank)) * 100))
-    : 100;
-
-  // --- Render ---
-
-  if (loading && !user) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
-         <div className="animate-pulse flex flex-col items-center">
-            <Shield className="text-blue-500 mb-4" size={48} />
-            <div className="text-slate-400 font-medium">Lade Anwendung...</div>
-         </div>
-      </div>
-    );
-  }
+  // --- RENDER ---
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 animate-fade-in">
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 pointer-events-none"></div>
-        <div className="bg-white/10 backdrop-blur-xl p-8 sm:p-12 rounded-3xl shadow-2xl w-full max-w-md border border-white/20 relative overflow-hidden">
-           {/* Decorative elements */}
-           <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-500 rounded-full blur-3xl opacity-20"></div>
-           <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-indigo-500 rounded-full blur-3xl opacity-20"></div>
+      <div className="min-h-screen flex items-center justify-center p-4 bg-slate-900">
+        <div className="w-full max-w-md bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-2xl">
+           <div className="flex justify-center mb-6">
+              <div className="p-4 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-500/30">
+                 <Shield size={40} />
+              </div>
+           </div>
+           <h1 className="text-2xl font-bold text-center text-slate-900 dark:text-white mb-2">Polizei Lerntool</h1>
+           <p className="text-center text-slate-500 dark:text-slate-400 mb-8">Dienstprüfung E1 / E2a</p>
            
-          <div className="text-center mb-10 relative z-10">
-            <div className="inline-flex p-5 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white mb-6 shadow-lg shadow-blue-500/30 ring-4 ring-white/10">
-              <Shield size={48} strokeWidth={1.5} />
-            </div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Polizei Lerntool</h1>
-            <p className="text-blue-200 mt-2 font-medium">E1 / E2a Dienstprüfung</p>
-          </div>
-          <form onSubmit={handleLogin} className="space-y-5 relative z-10">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-blue-200 uppercase tracking-wider ml-1">Nutzername</label>
-              <input 
-                type="text" 
-                value={username}
-                onChange={e => setUsername(e.target.value)}
-                className="w-full px-5 py-3.5 rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                placeholder="Name eingeben"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-blue-200 uppercase tracking-wider ml-1">Passwort</label>
-              <input 
-                type="password" 
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                className="w-full px-5 py-3.5 rounded-xl bg-slate-900/50 border border-white/10 text-white placeholder-slate-400 focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none transition-all"
-                placeholder="••••••"
-              />
-            </div>
-            <button type="submit" className="w-full py-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold shadow-lg shadow-blue-900/40 transition-all transform active:scale-[0.98] mt-2">
-              Anmelden
-            </button>
-          </form>
-          <div className="mt-6 text-center text-slate-400 text-xs">
-            Bei neuem Namen wird automatisch ein Profil erstellt.
-          </div>
+           <form onSubmit={handleLogin} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold uppercase text-slate-500 ml-1">Nutzername</label>
+                <input 
+                  value={username} 
+                  onChange={e => setUsername(e.target.value)}
+                  className="w-full mt-1 p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-transparent focus:border-blue-500 outline-none dark:text-white"
+                  placeholder="Name"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold uppercase text-slate-500 ml-1">Passwort</label>
+                <input 
+                  type="password"
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)}
+                  className="w-full mt-1 p-3 rounded-xl bg-slate-100 dark:bg-slate-900 border border-transparent focus:border-blue-500 outline-none dark:text-white"
+                  placeholder="••••••"
+                />
+              </div>
+              <button className="w-full py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition-transform active:scale-95">
+                Anmelden
+              </button>
+           </form>
         </div>
       </div>
     );
   }
 
+  // --- Authenticated Layout ---
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 pb-20">
       
-      {/* Navigation & Header */}
-      <nav className="sticky top-0 z-50 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-20">
-            
-            {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="bg-blue-600 p-2 rounded-lg text-white shadow-md shadow-blue-500/20">
-                <Shield size={24} />
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="font-bold text-lg leading-none text-slate-900 dark:text-white">Lerntool</h1>
-                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">E1 / E2a</span>
-              </div>
-            </div>
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 h-16 flex items-center justify-between">
+         <div className="flex items-center gap-3">
+            <div className="bg-blue-600 p-1.5 rounded-lg text-white"><Shield size={18} /></div>
+            <span className="font-bold hidden sm:inline">Lerntool</span>
+         </div>
+         
+         <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+            <button onClick={() => setView('dashboard')} className={`p-2 rounded-md transition-all ${view === 'dashboard' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-white' : 'text-slate-500'}`}><LayoutDashboard size={18} /></button>
+            <button onClick={() => setView('train')} className={`p-2 rounded-md transition-all ${view === 'train' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-white' : 'text-slate-500'}`}><BrainCircuit size={18} /></button>
+            {user.role === 'admin' && <button onClick={() => setView('admin')} className={`p-2 rounded-md transition-all ${view === 'admin' ? 'bg-white dark:bg-slate-700 shadow-sm text-blue-600 dark:text-white' : 'text-slate-500'}`}><Settings size={18} /></button>}
+         </div>
 
-            {/* Nav Items */}
-            <div className="flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800/50 p-1.5 rounded-xl">
-              <button 
-                onClick={() => setView('dashboard')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all text-sm font-medium ${view === 'dashboard' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-              >
-                <LayoutDashboard size={18} />
-                <span className="hidden sm:inline">Übersicht</span>
-              </button>
-              <button 
-                onClick={() => setView('train')}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all text-sm font-medium ${view === 'train' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
-              >
-                <BrainCircuit size={18} />
-                <span className="hidden sm:inline">Training</span>
-              </button>
-              {user.role === 'admin' && (
-                <button 
-                  onClick={() => setView('admin')}
-                  className={`px-3 py-2 rounded-lg flex items-center transition-all ${view === 'admin' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
-                >
-                  <Settings size={18} />
-                </button>
-              )}
-            </div>
+         <div className="flex items-center gap-3">
+             <button onClick={() => setDarkMode(!darkMode)} className="text-slate-500">{darkMode ? <Sun size={18} /> : <Moon size={18} />}</button>
+             <button onClick={() => setUser(null)} className="text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg"><LogOut size={18} /></button>
+         </div>
+      </div>
 
-            {/* User Profile & XP */}
-            <div className="flex items-center gap-4">
-               {/* Rank Progress - Desktop */}
-               <div className="hidden md:flex flex-col items-end min-w-[140px]">
-                  <div className="flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    <GraduationCap size={14} className="text-blue-500" />
-                    <span>{currentRank.title}</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full mt-1.5 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-1000" style={{ width: `${progressToNextRank}%` }}></div>
-                  </div>
-                  {nextRank && <span className="text-[10px] text-slate-400 mt-0.5">{Math.floor(xp)} / {nextRank.min} XP</span>}
-               </div>
-
-               <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
-
-               <div className="flex items-center gap-2">
-                  <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 dark:text-slate-400">
-                    {darkMode ? <Sun size={20} /> : <Moon size={20} />}
-                  </button>
-                  <div className="group relative">
-                     <button className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shadow-md ring-2 ring-white dark:ring-slate-900">
-                        {user.username.substring(0,2).toUpperCase()}
-                     </button>
-                     <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 py-1 hidden group-hover:block animate-fade-in origin-top-right">
-                        <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800">
-                          <p className="text-sm font-semibold dark:text-white">{user.username}</p>
-                          <p className="text-xs text-slate-500">{user.role}</p>
-                        </div>
-                        <button onClick={() => setUser(null)} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2">
-                           <LogOut size={14} /> Abmelden
-                        </button>
-                     </div>
-                  </div>
-               </div>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-slide-up">
+      <div className="max-w-4xl mx-auto p-4 md:p-6">
         
+        {/* VIEW: DASHBOARD */}
         {view === 'dashboard' && (
-          <Dashboard 
-            stats={statsGroups} 
-            rank={currentRank.title}
-            score={xp} 
-            streak={0} 
-            progress={progress} 
-          />
+           <DashboardStats stats={statsGroups} score={progress.totalCorrect * 10} rank="Inspektor" />
         )}
 
+        {/* VIEW: TRAIN */}
         {view === 'train' && (
-          <div className="max-w-4xl mx-auto">
-             {/* Filter & Status Bar */}
-             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                <div>
-                   <h2 className="text-2xl font-bold dark:text-white flex items-center gap-2">
-                      Training
-                      <span className="px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 text-xs font-mono">
-                         #{currentQIndex + 1}
-                      </span>
-                   </h2>
-                   <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                      Wähle ein Thema oder starte den Mix-Modus.
-                   </p>
-                </div>
-                
-                <div className="flex gap-2 flex-wrap">
-                   <button 
-                      onClick={() => setFilter({tags:[], difficulty:0})}
-                      className={`text-xs px-4 py-2 rounded-full border transition-all font-medium ${
-                          filter.tags.length === 0
-                          ? 'bg-slate-900 text-white border-slate-900 dark:bg-white dark:text-slate-900' 
-                          : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-400'
-                      }`}
-                   >
-                     Alle Themen
-                   </button>
-                   {Object.keys(GROUP_TAGS).map(k => (
-                      <button 
-                        key={k}
-                        onClick={() => setFilter(prev => {
-                            const tag = GROUP_TAGS[k][0];
-                            const isActive = prev.tags.includes(tag);
-                            return { ...prev, tags: isActive ? [] : [tag] }
-                        })}
-                        className={`text-xs px-4 py-2 rounded-full border transition-all font-medium ${
-                            filter.tags.includes(GROUP_TAGS[k][0]) 
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-500/20' 
-                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-blue-300'
-                        }`}
-                      >
-                        {GROUPS.find(g => g.key === k)?.title.split(' ')[0] || k}
-                      </button>
-                   ))}
-                </div>
-             </div>
-             
-             {filteredQuestions.length > 0 ? (
-                <div key={currentQuestion.id}> {/* Key forces remount/animation on question change */}
-                  <QuestionCard 
-                    question={currentQuestion}
-                    idx={currentQIndex}
-                    submitted={submitted}
-                    onSubmit={handleAnswer}
-                    onNext={nextQuestion}
-                    tier={2} 
-                  />
-                </div>
-             ) : (
-                <div className="flex flex-col items-center justify-center p-16 bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 text-center animate-fade-in">
-                    <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-400">
-                      <Settings size={32} />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Keine Fragen gefunden</h3>
-                    <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-xs mx-auto">
-                      Für die gewählten Filter sind derzeit keine Fragen verfügbar.
-                    </p>
+           <div className="animate-slide-up">
+              {/* Filter Bar */}
+              <div className="flex flex-wrap gap-2 mb-6">
+                <button 
+                   onClick={() => setActiveTag(null)}
+                   className={`px-4 py-2 rounded-full text-xs font-bold border transition-colors ${!activeTag ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
+                >
+                    Alle
+                </button>
+                {GROUPS.map(g => (
                     <button 
-                      onClick={() => setFilter({tags:[], difficulty:0})} 
-                      className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium shadow-lg shadow-blue-500/20"
+                       key={g.key}
+                       onClick={() => setActiveTag(g.key)}
+                       className={`px-4 py-2 rounded-full text-xs font-bold border transition-colors ${activeTag === g.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}
                     >
-                      Filter zurücksetzen
+                        {g.key}
                     </button>
-                </div>
-             )}
-          </div>
+                ))}
+              </div>
+
+              {currentQuestion ? (
+                 <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl overflow-hidden border border-slate-100 dark:border-slate-800">
+                    {/* Progress Line */}
+                    <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800"><div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${((currentQIndex % filteredQuestions.length)/filteredQuestions.length)*100}%` }}></div></div>
+                    
+                    <div className="p-6 md:p-10">
+                       <div className="flex gap-2 mb-6">
+                          <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded text-xs font-mono text-slate-500">{currentQuestion.id}</span>
+                          <span className="px-2 py-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded text-xs font-bold">{currentQuestion.tags[0]}</span>
+                       </div>
+                       
+                       <h2 className="text-xl md:text-2xl font-bold mb-8 leading-snug">{currentQuestion.question}</h2>
+
+                       <div className="space-y-3">
+                          {seededShuffle([0,1,2,3,4], `${currentQuestion.id}#${currentQIndex}`).map((originalIdx, displayIdx) => {
+                              const isSelected = selectedAnswers.includes(displayIdx);
+                              const isCorrect = currentQuestion.correct.includes(originalIdx);
+                              
+                              let style = "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800";
+                              if (submitted) {
+                                  if(isCorrect) style = "border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20";
+                                  else if(isSelected && !isCorrect) style = "border-red-500 bg-red-50 dark:bg-red-900/20 opacity-70";
+                                  else style = "opacity-50 grayscale";
+                              } else if (isSelected) {
+                                  style = "border-blue-500 bg-blue-50 dark:bg-blue-900/20 ring-1 ring-blue-500";
+                              }
+
+                              return (
+                                  <button
+                                    key={displayIdx}
+                                    onClick={() => {
+                                        if(submitted) return;
+                                        setSelectedAnswers(prev => prev.includes(displayIdx) ? prev.filter(x => x !== displayIdx) : [...prev, displayIdx]);
+                                    }}
+                                    className={`w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 ${style}`}
+                                  >
+                                     <div className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${submitted && isCorrect ? 'bg-emerald-500 border-emerald-500 text-white' : isSelected ? 'bg-blue-500 border-blue-500 text-white' : 'border-slate-300'}`}>
+                                        {submitted && isCorrect ? <CheckCircle2 size={14} /> : submitted && isSelected ? <XCircle size={14} /> : <span className="text-xs font-bold">{String.fromCharCode(65+displayIdx)}</span>}
+                                     </div>
+                                     <span className="text-sm md:text-base">{currentQuestion.choices[originalIdx]}</span>
+                                  </button>
+                              )
+                          })}
+                       </div>
+
+                       <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                           {!submitted ? (
+                               <button 
+                                 onClick={submitAnswer} 
+                                 disabled={selectedAnswers.length === 0}
+                                 className={`px-8 py-3 rounded-xl font-bold flex items-center gap-2 ${selectedAnswers.length > 0 ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : 'bg-slate-200 text-slate-400'}`}
+                               >
+                                   Prüfen <ArrowRight size={18} />
+                               </button>
+                           ) : (
+                               <div className="w-full">
+                                  <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl border border-amber-200 dark:border-amber-800 mb-4 text-sm text-slate-700 dark:text-slate-300">
+                                     <strong className="block mb-1 text-amber-700 dark:text-amber-400 flex items-center gap-2"><BookOpen size={16}/> Erklärung:</strong>
+                                     {currentQuestion.explain} <br/>
+                                     <span className="text-xs mt-2 inline-block px-2 py-0.5 bg-amber-100 dark:bg-amber-900/40 rounded text-amber-800 dark:text-amber-300 font-mono">§ {currentQuestion.law_ref}</span>
+                                  </div>
+                                  <div className="flex justify-end">
+                                    <button onClick={nextQuestion} className="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg flex items-center gap-2">
+                                        Nächste Frage <ChevronRight size={18} />
+                                    </button>
+                                  </div>
+                               </div>
+                           )}
+                       </div>
+                    </div>
+                 </div>
+              ) : (
+                 <div className="text-center py-20 text-slate-400">Keine Fragen gefunden.</div>
+              )}
+           </div>
         )}
 
+        {/* VIEW: ADMIN */}
         {view === 'admin' && (
-          <div className="max-w-4xl mx-auto">
-             <AdminPanel 
-                questions={questions} 
-                onDelete={(id: string) => {
-                    const newQ = questions.filter(q => q.id !== id);
-                    setQuestions(newQ);
-                }}
-                onSave={(q: Question) => {
-                     setQuestions(prev => {
-                        const exists = prev.find(p => p.id === q.id);
-                        if(exists) return prev.map(p => p.id === q.id ? q : p);
-                        return [...prev, q];
-                     });
-                }}
-              />
-          </div>
+           <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 animate-slide-up">
+              <h2 className="text-xl font-bold mb-6 flex items-center gap-2"><Settings className="text-blue-500"/> Verwaltung</h2>
+              <div className="h-96 overflow-y-auto border rounded-xl dark:border-slate-800 mb-4">
+                 {questions.map(q => (
+                    <div key={q.id} className="p-3 border-b dark:border-slate-800 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <span className="text-sm truncate max-w-md">{q.question}</span>
+                        <button 
+                           onClick={() => {
+                               const newQs = questions.filter(x => x.id !== q.id);
+                               setQuestions(newQs);
+                               // Delete Remote
+                               if(db) setDoc(doc(db, "questions", q.id), { ...q, __deleted: true }).catch(console.error);
+                           }}
+                           className="text-red-500 text-xs font-bold px-2 py-1 rounded hover:bg-red-50"
+                        >
+                            Löschen
+                        </button>
+                    </div>
+                 ))}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                 <button className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl font-medium text-sm hover:bg-slate-200" onClick={() => {
+                     const blob = new Blob([JSON.stringify(questions)], {type:'application/json'});
+                     const url = URL.createObjectURL(blob);
+                     const a = document.createElement('a'); a.href=url; a.download='backup.json'; a.click();
+                 }}>Backup Download</button>
+                 <div className="relative">
+                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if(file) {
+                            const reader = new FileReader();
+                            reader.onload = (ev) => {
+                                try {
+                                    const parsed = JSON.parse(ev.target?.result as string);
+                                    if(Array.isArray(parsed)) {
+                                        setQuestions(parsed);
+                                        // Sync
+                                        if(db) {
+                                            const batch = writeBatch(db);
+                                            parsed.forEach(p => batch.set(doc(db,"questions",p.id), p));
+                                            batch.commit();
+                                        }
+                                        alert("Import erfolgreich");
+                                    }
+                                } catch(err) { alert("Fehler beim Import"); }
+                            };
+                            reader.readAsText(file);
+                        }
+                    }} />
+                    <button className="w-full h-full p-3 bg-blue-600 text-white rounded-xl font-medium text-sm">JSON Import</button>
+                 </div>
+              </div>
+           </div>
         )}
 
-      </main>
+      </div>
     </div>
   );
 }
