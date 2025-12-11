@@ -104,6 +104,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // Training State
   const [currentQIndex, setCurrentQIndex] = useState(0);
@@ -120,48 +121,68 @@ export default function App() {
 
   // Load Initial Data (Firestore or LocalStorage fallback)
   useEffect(() => {
+    // Safety timeout to ensure loading screen doesn't get stuck if firebase fails
+    const safetyTimer = setTimeout(() => setLoading(false), 2000);
+
     // 1. Listen for Users
     let unsubUsers = () => {};
     if (db) {
-      unsubUsers = onSnapshot(collection(db, FIRESTORE_COLLECTIONS.USERS), (snap) => {
-        const uList: User[] = [];
-        snap.forEach(d => uList.push(d.data() as User));
-        setUsers(uList.length ? uList : []);
-      });
+      try {
+        unsubUsers = onSnapshot(collection(db, FIRESTORE_COLLECTIONS.USERS), (snap) => {
+          const uList: User[] = [];
+          snap.forEach(d => uList.push(d.data() as User));
+          setUsers(uList.length ? uList : []);
+          setLoading(false);
+        }, (err) => {
+           console.warn("Firestore users error", err);
+           setLoading(false);
+        });
+      } catch (e) { console.error(e); setLoading(false); }
     } else {
        const localUsers = localStorage.getItem("users");
        if(localUsers) setUsers(JSON.parse(localUsers));
+       setLoading(false);
     }
 
     // 2. Listen for Questions
     let unsubQuestions = () => {};
     if (db) {
-      unsubQuestions = onSnapshot(collection(db, FIRESTORE_COLLECTIONS.QUESTIONS), (snap) => {
-        const qList: Question[] = [];
-        snap.forEach(d => {
-            const data = d.data() as Question;
-            if(!data.__deleted) qList.push(data);
-        });
-        setQuestions(qList.length ? qList : DEFAULT_QUESTIONS);
-      });
+      try {
+        unsubQuestions = onSnapshot(collection(db, FIRESTORE_COLLECTIONS.QUESTIONS), (snap) => {
+          const qList: Question[] = [];
+          snap.forEach(d => {
+              const data = d.data() as Question;
+              if(!data.__deleted) qList.push(data);
+          });
+          setQuestions(qList.length ? qList : DEFAULT_QUESTIONS);
+        }, (err) => console.warn("Firestore questions error", err));
+      } catch (e) { console.error(e); }
     } else {
         setQuestions(DEFAULT_QUESTIONS);
     }
 
-    return () => { unsubUsers(); unsubQuestions(); };
+    return () => { 
+      unsubUsers(); 
+      unsubQuestions(); 
+      clearTimeout(safetyTimer);
+    };
   }, []);
 
   // Listen for active user progress
   useEffect(() => {
     if (!user || !db) return;
-    const unsub = onSnapshot(doc(db, FIRESTORE_COLLECTIONS.PROGRESS, user.id), (doc) => {
-      if (doc.exists()) {
-        const data = doc.data();
-        const metrics = data[user.id + ':metrics'];
-        if (metrics) setProgress(metrics);
-      }
-    });
-    return () => unsub();
+    try {
+      const unsub = onSnapshot(doc(db, FIRESTORE_COLLECTIONS.PROGRESS, user.id), (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          const metrics = data[user.id + ':metrics'];
+          if (metrics) setProgress(metrics);
+        }
+      });
+      return () => unsub();
+    } catch (e) {
+      console.warn("Progress sync failed", e);
+    }
   }, [user]);
 
   // --- Logic ---
@@ -276,6 +297,17 @@ export default function App() {
     : 100;
 
   // --- Render ---
+
+  if (loading && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
+         <div className="animate-pulse flex flex-col items-center">
+            <Shield className="text-blue-500 mb-4" size={48} />
+            <div className="text-slate-400 font-medium">Lade Anwendung...</div>
+         </div>
+      </div>
+    );
+  }
 
   if (!user) {
     return (
